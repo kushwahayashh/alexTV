@@ -2,6 +2,10 @@
     <!-- Needed to fetch TMDB data and load poster/backdrop images. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Self-update: lets the app launch the system installer for the APK it
+         downloads. The user still confirms the install in the OS popup. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
     <!-- Android TV: leanback = TV support; touchscreen not required so it also
          installs on TV devices that have no touchscreen. -->
     <uses-feature

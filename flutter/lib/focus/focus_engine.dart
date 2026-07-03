@@ -16,7 +16,8 @@ class _Entry {
   final GlobalKey key;
   final VoidCallback? onSelect;
   final VoidCallback? onFocused; // scrolls itself into view, like scrollIntoView
-  _Entry(this.id, this.key, this.onSelect, this.onFocused);
+  final bool isHeader; // top bar (e.g. Update button), reached by Up from hero
+  _Entry(this.id, this.key, this.onSelect, this.onFocused, this.isHeader);
 
   Rect? get rect {
     final ctx = key.currentContext;
@@ -31,19 +32,28 @@ class _Entry {
 class FocusController extends ChangeNotifier {
   final _entries = <int, _Entry>{};
   int? _focusId;
+  int? _headerId; // the top-bar focusable, if one is registered
   int _counter = 0;
 
   int? get focusId => _focusId;
   bool isFocused(int id) => _focusId == id;
 
-  int register({VoidCallback? onSelect, VoidCallback? onFocused}) {
+  int register({
+    VoidCallback? onSelect,
+    VoidCallback? onFocused,
+    bool isHeader = false,
+  }) {
     final id = _counter++;
-    _entries[id] = _Entry(id, GlobalKey(), onSelect, onFocused);
+    _entries[id] = _Entry(id, GlobalKey(), onSelect, onFocused, isHeader);
+    if (isHeader) _headerId = id;
     return id;
   }
 
   GlobalKey keyOf(int id) => _entries[id]!.key;
-  void unregister(int id) => _entries.remove(id);
+  void unregister(int id) {
+    _entries.remove(id);
+    if (_headerId == id) _headerId = null;
+  }
 
   void _setFocus(int id) {
     if (!_entries.containsKey(id)) return;
@@ -68,6 +78,7 @@ class FocusController extends ChangeNotifier {
     _Entry? best;
     Rect? bestR;
     for (final e in _entries.values) {
+      if (e.isHeader) continue; // header isn't part of the content grid
       final r = e.rect;
       if (r == null) continue;
       if (bestR == null ||
@@ -91,6 +102,7 @@ class FocusController extends ChangeNotifier {
 
     for (final e in _entries.values) {
       if (e.id == currentId) continue;
+      if (e.isHeader) continue; // reached only via the explicit Up-from-top path
       final to = e.rect;
       if (to == null) continue;
       final tc = to.center;
@@ -136,8 +148,22 @@ class FocusController extends ChangeNotifier {
     };
     if (dir != null) {
       final cur = _focusId;
-      // Nothing focused yet (hero showing) — enter the grid at the first card.
+      // Header (e.g. Update button) focused: Down drops back to the hero,
+      // other directions are ignored (it's the only thing up here).
+      if (cur != null && cur == _headerId) {
+        if (dir == Direction.down) {
+          clearFocus();
+          onReleaseTop?.call();
+        }
+        return KeyEventResult.handled;
+      }
+      // Nothing focused yet (hero showing). Up reaches the top-bar header;
+      // any other direction enters the content grid at the first card.
       if (cur == null) {
+        if (dir == Direction.up) {
+          if (_headerId != null) _setFocus(_headerId!);
+          return KeyEventResult.handled;
+        }
         final first = _firstInOrder();
         if (first != null) _setFocus(first);
         return KeyEventResult.handled;
