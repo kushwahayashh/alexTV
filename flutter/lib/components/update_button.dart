@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../focus/focus_engine.dart';
 import 'header_button.dart';
 import '../update/updater.dart';
 

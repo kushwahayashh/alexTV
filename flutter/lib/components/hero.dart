@@ -124,7 +124,7 @@ class _Scrim extends StatelessWidget {
 
 class _HeroContent extends StatelessWidget {
   final Media media;
-  const _HeroContent({super.key, required this.media});
+  const _HeroContent({required this.media});
 
   @override
   Widget build(BuildContext context) {
