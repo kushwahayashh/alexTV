@@ -9,7 +9,11 @@ import '../update/updater.dart';
 /// launches the system installer. While downloading, its label reads
 /// "Downloading…" and it ignores further presses.
 class UpdateButton extends StatefulWidget {
-  const UpdateButton({super.key});
+  /// Called when the button gains focus — used to scroll the hero back into
+  /// view so the button (which lives on the hero) is actually visible.
+  final VoidCallback? onFocused;
+
+  const UpdateButton({super.key, this.onFocused});
 
   @override
   State<UpdateButton> createState() => _UpdateButtonState();
@@ -26,7 +30,11 @@ class _UpdateButtonState extends State<UpdateButton> {
     super.didChangeDependencies();
     if (!_registered) {
       _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(onSelect: _update, isHeader: true);
+      _id = _controller.register(
+        onSelect: _update,
+        onFocused: widget.onFocused,
+        isHeader: true,
+      );
       _registered = true;
     }
   }

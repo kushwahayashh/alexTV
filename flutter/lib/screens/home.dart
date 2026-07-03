@@ -106,47 +106,49 @@ class _HomeState extends State<Home> {
       case _Status.error:
         return const _ScreenMsg('Failed to load. Check the network / API key.');
       case _Status.ready:
-        return Stack(
-          children: [
-            SingleChildScrollView(
-              controller: _pageController,
-              physics: const ClampingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return SingleChildScrollView(
+          controller: _pageController,
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Hero with the Update action overlaid on its top-right corner.
+              // Keeping the button inside the scroll content means it scrolls
+              // away with the hero instead of floating over the cards.
+              Stack(
                 children: [
                   ui.Hero(
                     media: _featured.isNotEmpty ? _featured[_heroIndex] : null,
                   ),
-                  // Pull the rails up into the base of the hero (margin-top: -80).
-                  Transform.translate(
-                    offset: const Offset(0, -AppSizes.railsOverlap),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 64),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (final rail in _rails) ...[
-                            Rail(
-                              rail: rail,
-                              pageController: _pageController,
-                              onSelect: (m) => debugPrint('SELECT ${m.title}'),
-                            ),
-                            const SizedBox(height: AppSizes.railGap),
-                          ],
-                        ],
-                      ),
-                    ),
+                  Positioned(
+                    top: 24,
+                    right: AppSizes.pagePadding,
+                    child: UpdateButton(onFocused: _releaseToTop),
                   ),
                 ],
               ),
-            ),
-            // Top-right Update action — reached by pressing Up from the hero.
-            const Positioned(
-              top: 24,
-              right: AppSizes.pagePadding,
-              child: UpdateButton(),
-            ),
-          ],
+              // Pull the rails up into the base of the hero (margin-top: -80).
+              Transform.translate(
+                offset: const Offset(0, -AppSizes.railsOverlap),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 64),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final rail in _rails) ...[
+                        Rail(
+                          rail: rail,
+                          pageController: _pageController,
+                          onSelect: (m) => debugPrint('SELECT ${m.title}'),
+                        ),
+                        const SizedBox(height: AppSizes.railGap),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
     }
   }
