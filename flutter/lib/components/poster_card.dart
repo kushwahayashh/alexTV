@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
@@ -54,28 +55,41 @@ class _PosterCardState extends State<PosterCard> {
     if (ctx == null) return;
     final box = ctx.findRenderObject() as RenderBox?;
     if (box == null || !box.attached) return;
-    final topLeft = box.localToGlobal(Offset.zero);
-    final size = box.size;
 
     const dur = Duration(milliseconds: 320);
     const curve = Curves.easeOut;
 
-    // Vertical lift: bring the poster's top edge to scrollPaddingTop from top.
-    final page = widget.pageController;
-    if (page.hasClients) {
-      final target = (page.offset + topLeft.dy - AppSizes.scrollPaddingTop)
-          .clamp(page.position.minScrollExtent, page.position.maxScrollExtent);
-      page.animateTo(target, duration: dur, curve: curve);
-    }
+    // Ask each enclosing viewport directly how far to scroll to reveal this
+    // poster. getOffsetToReveal works in the viewport's OWN coordinate space,
+    // so it stays correct even though the whole app is scaled by the FittedBox
+    // in _DesignScaler. (The old approach mixed localToGlobal screen pixels —
+    // scaled by that FittedBox — with unscaled scroll offsets, which happened
+    // to match on the ~1:1 browser window but broke on the TV, where the scale
+    // differs, leaving rows under-lifted and clipped.)
 
-    // Horizontal: center the poster within its rail.
+    // Nearest viewport = this rail's horizontal list. Center the poster in it
+    // (mirrors the web's scrollIntoView inline:'center').
     final rail = widget.railController;
-    if (rail.hasClients) {
-      final screenW = MediaQuery.of(ctx).size.width;
-      final centerX = topLeft.dx + size.width / 2;
-      final target = (rail.offset + centerX - screenW / 2)
+    final railViewport = RenderAbstractViewport.maybeOf(box);
+    if (rail.hasClients && railViewport != null) {
+      final target = railViewport
+          .getOffsetToReveal(box, 0.5) // 0.5 => centered on the main axis
+          .offset
           .clamp(rail.position.minScrollExtent, rail.position.maxScrollExtent);
       rail.animateTo(target, duration: dur, curve: curve);
+    }
+
+    // Outer viewport = the vertical page. Lift the poster's top to
+    // scrollPaddingTop from the top (web: block:'start' + scroll-padding-top).
+    final page = widget.pageController;
+    final pageViewport = railViewport == null
+        ? null
+        : RenderAbstractViewport.maybeOf(railViewport.parent);
+    if (page.hasClients && pageViewport != null) {
+      final revealTop = pageViewport.getOffsetToReveal(box, 0.0).offset;
+      final target = (revealTop - AppSizes.scrollPaddingTop)
+          .clamp(page.position.minScrollExtent, page.position.maxScrollExtent);
+      page.animateTo(target, duration: dur, curve: curve);
     }
   }
 

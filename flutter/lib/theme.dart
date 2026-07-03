@@ -15,8 +15,9 @@ class AppSizes {
   // real screen. Keeps the look consistent across the browser dev window and
   // actual TVs (which report a narrow logical canvas at a high pixel ratio,
   // making fixed-size widgets look zoomed in). Larger value => more content
-  // fits => more zoomed out. 1920 matches a 1080p TV's native resolution.
-  static const designWidth = 1920.0;
+  // fits => more zoomed out. 1600 sits between "too big" (1280) and "too
+  // small" (1920).
+  static const designWidth = 1600.0;
 
   static const radius = 10.0;
   static const pagePadding = 48.0;
