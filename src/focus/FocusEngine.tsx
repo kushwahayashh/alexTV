@@ -25,6 +25,7 @@ type FocusableEntry = {
   element: HTMLElement
   onSelect?: () => void
   onFocus?: () => void
+  isHeader?: boolean
 }
 
 type FocusContextValue = {
@@ -58,6 +59,7 @@ function findNext(
 
   for (const entry of entries.values()) {
     if (entry.id === currentId) continue
+    if (entry.isHeader) continue // header reached only via the explicit Up-from-hero path
     const to = rectOf(entry.element)
 
     const dx = to.cx - from.cx
@@ -94,6 +96,7 @@ export function FocusProvider({
   const [focusId, setFocusId] = useState<string | null>(null)
   const focusIdRef = useRef<string | null>(null)
   focusIdRef.current = focusId
+  const headerIdRef = useRef<string | null>(null)
 
   const setFocus = useCallback((id: string) => {
     if (!entries.current.has(id)) return
@@ -114,6 +117,7 @@ export function FocusProvider({
   const firstInDomOrder = useCallback((): FocusableEntry | null => {
     let first: FocusableEntry | null = null
     for (const e of entries.current.values()) {
+      if (e.isHeader) continue // header isn't part of the content grid
       if (
         !first ||
         e.element.compareDocumentPosition(first.element) &
@@ -128,6 +132,7 @@ export function FocusProvider({
   const register = useCallback((entry: FocusableEntry) => {
     // No auto-seed: nothing is focused on load so the hero is fully visible.
     entries.current.set(entry.id, entry)
+    if (entry.isHeader) headerIdRef.current = entry.id
   }, [])
 
   // Release focus (back to no selection) and scroll the content container to
@@ -149,6 +154,7 @@ export function FocusProvider({
 
   const unregister = useCallback((id: string) => {
     entries.current.delete(id)
+    if (headerIdRef.current === id) headerIdRef.current = null
   }, [])
 
   useEffect(() => {
@@ -163,16 +169,28 @@ export function FocusProvider({
       if (e.key in dirMap) {
         e.preventDefault()
         const cur = focusIdRef.current
-        // Nothing focused yet (hero showing) — enter the grid at the first card.
+        const dir = dirMap[e.key]
+        // Header (e.g. Update button) focused: Down drops back to the hero,
+        // other directions are ignored (it's the only thing up here).
+        if (cur != null && cur === headerIdRef.current) {
+          if (dir === 'down') releaseToTop()
+          return
+        }
+        // Nothing focused yet (hero showing). Up reaches the header; any
+        // other direction enters the content grid at the first card.
         if (!cur) {
+          if (dir === 'up') {
+            if (headerIdRef.current) setFocus(headerIdRef.current)
+            return
+          }
           const first = firstInDomOrder()
           if (first) setFocus(first.id)
           return
         }
-        const next = findNext(entries.current, cur, dirMap[e.key])
+        const next = findNext(entries.current, cur, dir)
         if (next) {
           setFocus(next)
-        } else if (dirMap[e.key] === 'up') {
+        } else if (dir === 'up') {
           // Nothing above the top row — release focus back up to the hero.
           releaseToTop()
         }
@@ -211,6 +229,7 @@ let idCounter = 0
 export function useFocusable(opts?: {
   onSelect?: () => void
   onFocus?: () => void
+  isHeader?: boolean
 }) {
   const ctx = useContext(FocusContext)
   if (!ctx) throw new Error('useFocusable must be used within a FocusProvider')
@@ -231,6 +250,7 @@ export function useFocusable(opts?: {
       element: el,
       onSelect: () => optsRef.current?.onSelect?.(),
       onFocus: () => optsRef.current?.onFocus?.(),
+      isHeader: optsRef.current?.isHeader,
     })
     return () => ctx.unregister(id)
   }, [ctx, id])

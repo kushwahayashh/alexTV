@@ -47,6 +47,10 @@ body {
   display: none;
 }
 
+.home__hero-wrap {
+  position: relative;
+}
+
 .home__rails {
   position: relative;
   margin-top: -80px; /* rails overlap the base of the hero */
@@ -55,6 +59,29 @@ body {
   flex-direction: column;
   gap: 34px;
   z-index: 2;
+}
+
+/* ---------- Update button ---------- */
+.update-btn {
+  position: absolute;
+  top: 24px;
+  right: 48px;
+  z-index: 3;
+  padding: 10px 20px;
+  border: 2px solid var(--muted);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.update-btn:hover,
+.update-btn--focused {
+  background: var(--focus);
+  border-color: var(--focus);
+  color: var(--bg);
 }
 
 /* ---------- Hero ---------- */
