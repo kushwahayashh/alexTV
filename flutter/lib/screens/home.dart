@@ -8,7 +8,7 @@ import '../components/update_button.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
 
-const _heroRotateMs = 7000;
+const _heroRotateMs = 10000;
 
 class Home extends StatefulWidget {
   const Home({super.key});

@@ -153,6 +153,8 @@ class _HeroContent extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(media.mediaType == 'tv' ? 'Series' : 'Movie'),
               if (media.year.isNotEmpty) ...[

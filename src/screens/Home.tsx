@@ -4,7 +4,7 @@ import { Hero } from '../components/Hero'
 import { Rail } from '../components/Rail'
 import { HeaderButton } from '../components/HeaderButton'
 
-const HERO_ROTATE_MS = 7000
+const HERO_ROTATE_MS = 10000
 
 export function Home() {
   const [rails, setRails] = useState<RailData[]>([])
