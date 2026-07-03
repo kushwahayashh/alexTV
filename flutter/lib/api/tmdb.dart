@@ -1,5 +1,5 @@
-/// TMDB data layer. Read-only, direct fetch with the v3 API key.
-/// Ported from the React prototype's src/api/tmdb.ts. Note: for production the
+/// TMDB data layer. Read-only fetch via Cloudflare Workers proxy, same as the
+/// React prototype. Ported from src/api/tmdb.ts. Note: for production the
 /// key should move server-side / into secure storage — fine inline for this
 /// local prototype.
 library;
@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 const _apiKey = '8bd45cfb804f84ce85fa6accd833d6a1';
 const _base = 'https://api.themoviedb.org/3';
+const _proxy = 'https://lunaissohot.lunastar0003.workers.dev/?destination=';
 
 class Img {
   static String poster(String? path) =>
@@ -64,7 +65,8 @@ class Rail {
 
 Future<List<Map<String, dynamic>>> _get(String path) async {
   final sep = path.contains('?') ? '&' : '?';
-  final res = await http.get(Uri.parse('$_base$path${sep}api_key=$_apiKey'));
+  final targetUrl = '$_base$path${sep}api_key=$_apiKey';
+  final res = await http.get(Uri.parse('$_proxy${Uri.encodeComponent(targetUrl)}'));
   if (res.statusCode != 200) {
     throw Exception('TMDB ${res.statusCode} on $path');
   }

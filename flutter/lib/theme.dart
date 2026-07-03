@@ -16,7 +16,7 @@ class AppSizes {
   // actual TVs (which report a narrow logical canvas at a high pixel ratio,
   // making fixed-size widgets look zoomed in). Smaller value => elements
   // render larger => more zoomed in.
-  static const designWidth = 1200.0;
+  static const designWidth = 1260.0;
 
   static const radius = 10.0;
   static const pagePadding = 48.0;

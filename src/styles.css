@@ -61,24 +61,33 @@ body {
   z-index: 2;
 }
 
-/* ---------- Update button ---------- */
-.update-btn {
+/* ---------- Header buttons ---------- */
+.home__header {
   position: absolute;
   top: 24px;
-  right: 48px;
   z-index: 3;
+  display: flex;
+  gap: 12px;
+}
+.home__header--left {
+  left: 48px;
+}
+.home__header--right {
+  right: 48px;
+}
+.header-btn {
   padding: 10px 20px;
   border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.22);
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.16s ease, color 0.16s ease;
 }
-.update-btn:hover,
-.update-btn--focused {
+.header-btn:hover,
+.header-btn--focused {
   background: var(--focus);
   color: var(--bg);
 }

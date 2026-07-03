@@ -39,7 +39,16 @@ const FocusContext = createContext<FocusContextValue | null>(null)
 
 function rectOf(el: HTMLElement) {
   const r = el.getBoundingClientRect()
-  return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, ...r }
+  return {
+    cx: r.left + r.width / 2,
+    cy: r.top + r.height / 2,
+    left: r.left,
+    top: r.top,
+    right: r.right,
+    bottom: r.bottom,
+    width: r.width,
+    height: r.height,
+  }
 }
 
 /**
@@ -66,9 +75,12 @@ function findNext(
     const dy = to.cy - from.cy
 
     // Must lie in the pressed direction (with a small dead-zone tolerance).
+    // Left/right only move within the same row (vertical ranges overlap), so
+    // pressing past the last/first item just stops — no row jumping.
+    const sameRow = to.top < from.bottom && to.bottom > from.top
     const inDirection =
-      (dir === 'left' && dx < -1) ||
-      (dir === 'right' && dx > 1) ||
+      (dir === 'left' && dx < -1 && sameRow) ||
+      (dir === 'right' && dx > 1 && sameRow) ||
       (dir === 'up' && dy < -1) ||
       (dir === 'down' && dy > 1)
     if (!inDirection) continue
@@ -96,7 +108,7 @@ export function FocusProvider({
   const [focusId, setFocusId] = useState<string | null>(null)
   const focusIdRef = useRef<string | null>(null)
   focusIdRef.current = focusId
-  const headerIdRef = useRef<string | null>(null)
+  const headerIdsRef = useRef<Set<string>>(new Set())
 
   const setFocus = useCallback((id: string) => {
     if (!entries.current.has(id)) return
@@ -132,7 +144,7 @@ export function FocusProvider({
   const register = useCallback((entry: FocusableEntry) => {
     // No auto-seed: nothing is focused on load so the hero is fully visible.
     entries.current.set(entry.id, entry)
-    if (entry.isHeader) headerIdRef.current = entry.id
+    if (entry.isHeader) headerIdsRef.current.add(entry.id)
   }, [])
 
   // Release focus (back to no selection) and scroll the content container to
@@ -154,8 +166,48 @@ export function FocusProvider({
 
   const unregister = useCallback((id: string) => {
     entries.current.delete(id)
-    if (headerIdRef.current === id) headerIdRef.current = null
+    headerIdsRef.current.delete(id)
   }, [])
+
+  // Leftmost header in document order — where focus enters when pressing Up
+  // from the hero.
+  const firstHeader = useCallback((): FocusableEntry | null => {
+    let first: FocusableEntry | null = null
+    for (const id of headerIdsRef.current) {
+      const e = entries.current.get(id)
+      if (!e) continue
+      if (
+        !first ||
+        e.element.compareDocumentPosition(first.element) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ) {
+        first = e
+      }
+    }
+    return first
+  }, [])
+
+  // Next header in the pressed horizontal direction, or null if none.
+  const nextHeader = useCallback(
+    (currentId: string, dir: 'left' | 'right'): string | null => {
+      const cur = entries.current.get(currentId)
+      if (!cur) return null
+      const from = rectOf(cur.element)
+      let best: { id: string; cost: number } | null = null
+      for (const id of headerIdsRef.current) {
+        if (id === currentId) continue
+        const e = entries.current.get(id)
+        if (!e) continue
+        const to = rectOf(e.element)
+        const dx = to.cx - from.cx
+        if (dir === 'left' ? dx >= -1 : dx <= 1) continue
+        const cost = Math.abs(dx)
+        if (!best || cost < best.cost) best = { id, cost }
+      }
+      return best?.id ?? null
+    },
+    [],
+  )
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -170,17 +222,22 @@ export function FocusProvider({
         e.preventDefault()
         const cur = focusIdRef.current
         const dir = dirMap[e.key]
-        // Header (e.g. Update button) focused: Down drops back to the hero,
-        // other directions are ignored (it's the only thing up here).
-        if (cur != null && cur === headerIdRef.current) {
-          if (dir === 'down') releaseToTop()
+        // Header focused: left/right moves between headers, down drops to hero.
+        if (cur != null && headerIdsRef.current.has(cur)) {
+          if (dir === 'down') {
+            releaseToTop()
+          } else if (dir === 'left' || dir === 'right') {
+            const next = nextHeader(cur, dir)
+            if (next) setFocus(next)
+          }
           return
         }
-        // Nothing focused yet (hero showing). Up reaches the header; any
+        // Nothing focused yet (hero showing). Up reaches the first header; any
         // other direction enters the content grid at the first card.
         if (!cur) {
           if (dir === 'up') {
-            if (headerIdRef.current) setFocus(headerIdRef.current)
+            const first = firstHeader()
+            if (first) setFocus(first.id)
             return
           }
           const first = firstInDomOrder()
@@ -212,7 +269,7 @@ export function FocusProvider({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [setFocus, onBack, firstInDomOrder, releaseToTop])
+  }, [setFocus, onBack, firstInDomOrder, releaseToTop, firstHeader, nextHeader])
 
   return (
     <FocusContext.Provider value={{ register, unregister, focusId, setFocus }}>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchHomeRails, type Media, type Rail as RailData } from '../api/tmdb'
 import { Hero } from '../components/Hero'
 import { Rail } from '../components/Rail'
-import { UpdateButton } from '../components/UpdateButton'
+import { HeaderButton } from '../components/HeaderButton'
 
 const HERO_ROTATE_MS = 7000
 
@@ -53,7 +53,14 @@ export function Home() {
     <div className="home">
       <div className="home__hero-wrap">
         <Hero media={featured[heroIndex] ?? null} />
-        <UpdateButton />
+        <div className="home__header home__header--left">
+          <HeaderButton label="Home" />
+          <HeaderButton label="Search" />
+          <HeaderButton label="Library" />
+        </div>
+        <div className="home__header home__header--right">
+          <HeaderButton label="Update" />
+        </div>
       </div>
       <div className="home__rails">
         {rails.map((rail) => (

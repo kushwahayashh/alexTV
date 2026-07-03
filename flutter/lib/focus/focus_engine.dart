@@ -32,7 +32,7 @@ class _Entry {
 class FocusController extends ChangeNotifier {
   final _entries = <int, _Entry>{};
   int? _focusId;
-  int? _headerId; // the top-bar focusable, if one is registered
+  final _headerIds = <int>{}; // all header focusables
   int _counter = 0;
 
   int? get focusId => _focusId;
@@ -45,14 +45,14 @@ class FocusController extends ChangeNotifier {
   }) {
     final id = _counter++;
     _entries[id] = _Entry(id, GlobalKey(), onSelect, onFocused, isHeader);
-    if (isHeader) _headerId = id;
+    if (isHeader) _headerIds.add(id);
     return id;
   }
 
   GlobalKey keyOf(int id) => _entries[id]!.key;
   void unregister(int id) {
     _entries.remove(id);
-    if (_headerId == id) _headerId = null;
+    _headerIds.remove(id);
   }
 
   void _setFocus(int id) {
@@ -91,6 +91,49 @@ class FocusController extends ChangeNotifier {
     return best?.id;
   }
 
+  /// Leftmost header in document order — where focus enters when pressing Up
+  /// from the hero.
+  int? _firstHeader() {
+    _Entry? best;
+    Rect? bestR;
+    for (final id in _headerIds) {
+      final e = _entries[id];
+      if (e == null) continue;
+      final r = e.rect;
+      if (r == null) continue;
+      if (bestR == null || r.left < bestR.left) {
+        best = e;
+        bestR = r;
+      }
+    }
+    return best?.id;
+  }
+
+  /// Next header in the pressed horizontal direction, or null if none.
+  int? _nextHeader(int currentId, Direction dir) {
+    final current = _entries[currentId];
+    final from = current?.rect;
+    if (from == null) return null;
+    final fc = from.center;
+
+    int? bestId;
+    double bestCost = double.infinity;
+    for (final id in _headerIds) {
+      if (id == currentId) continue;
+      final e = _entries[id];
+      final to = e?.rect;
+      if (to == null) continue;
+      final dx = to.center.dx - fc.dx;
+      if (dir == Direction.left ? dx >= -1 : dx <= 1) continue;
+      final cost = dx.abs();
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestId = id;
+      }
+    }
+    return bestId;
+  }
+
   int? _findNext(int currentId, Direction dir) {
     final current = _entries[currentId];
     final from = current?.rect;
@@ -110,8 +153,8 @@ class FocusController extends ChangeNotifier {
       final dy = tc.dy - fc.dy;
 
       final inDirection = switch (dir) {
-        Direction.left => dx < -1,
-        Direction.right => dx > 1,
+        Direction.left => dx < -1 && dy.abs() < from.height / 2,
+        Direction.right => dx > 1 && dy.abs() < from.height / 2,
         Direction.up => dy < -1,
         Direction.down => dy > 1,
       };
@@ -148,20 +191,23 @@ class FocusController extends ChangeNotifier {
     };
     if (dir != null) {
       final cur = _focusId;
-      // Header (e.g. Update button) focused: Down drops back to the hero,
-      // other directions are ignored (it's the only thing up here).
-      if (cur != null && cur == _headerId) {
+      // Header focused: left/right moves between headers, down drops to hero.
+      if (cur != null && _headerIds.contains(cur)) {
         if (dir == Direction.down) {
           clearFocus();
           onReleaseTop?.call();
+        } else if (dir == Direction.left || dir == Direction.right) {
+          final next = _nextHeader(cur, dir);
+          if (next != null) _setFocus(next);
         }
         return KeyEventResult.handled;
       }
-      // Nothing focused yet (hero showing). Up reaches the top-bar header;
-      // any other direction enters the content grid at the first card.
+      // Nothing focused yet (hero showing). Up reaches the first header; any
+      // other direction enters the content grid at the first card.
       if (cur == null) {
         if (dir == Direction.up) {
-          if (_headerId != null) _setFocus(_headerId!);
+          final first = _firstHeader();
+          if (first != null) _setFocus(first);
           return KeyEventResult.handled;
         }
         final first = _firstInOrder();

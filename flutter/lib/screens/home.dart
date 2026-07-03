@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart' as api;
+import '../components/header_button.dart';
 import '../components/hero.dart' as ui;
 import '../components/rail.dart';
 import '../components/update_button.dart';
@@ -112,13 +113,27 @@ class _HomeState extends State<Home> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero with the Update action overlaid on its top-right corner.
-              // Keeping the button inside the scroll content means it scrolls
-              // away with the hero instead of floating over the cards.
+              // Hero with header buttons overlaid: Search + Library on the
+              // top-left, Update on the top-right. Keeping them inside the
+              // scroll content means they scroll away with the hero.
               Stack(
                 children: [
                   ui.Hero(
                     media: _featured.isNotEmpty ? _featured[_heroIndex] : null,
+                  ),
+                  Positioned(
+                    top: 24,
+                    left: AppSizes.pagePadding,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        HeaderButton(label: 'Home', onFocused: _releaseToTop),
+                        const SizedBox(width: 12),
+                        HeaderButton(label: 'Search', onFocused: _releaseToTop),
+                        const SizedBox(width: 12),
+                        HeaderButton(label: 'Library', onFocused: _releaseToTop),
+                      ],
+                    ),
                   ),
                   Positioned(
                     top: 24,
