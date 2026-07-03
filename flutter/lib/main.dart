@@ -43,23 +43,25 @@ class _DesignScaler extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final scale = constraints.maxWidth / AppSizes.designWidth;
-        // Give descendants a MediaQuery whose logical size matches the design
-        // canvas, so height-relative layout (e.g. the 94vh hero) stays correct.
+        // Height of the design canvas that preserves the real screen's aspect
+        // ratio, so fitting the width also fits the height (uniform, no stretch).
+        final designHeight =
+            AppSizes.designWidth * constraints.maxHeight / constraints.maxWidth;
         final media = MediaQuery.of(context);
-        return MediaQuery(
-          data: media.copyWith(
-            size: Size(
-              AppSizes.designWidth,
-              constraints.maxHeight / scale,
-            ),
-          ),
-          child: Transform.scale(
-            scale: scale,
-            alignment: Alignment.topLeft,
-            child: SizedBox(
-              width: AppSizes.designWidth,
-              height: constraints.maxHeight / scale,
+        // FittedBox lays the child out UNBOUNDED (so it's truly designWidth
+        // wide, not clamped to the screen) then scales it to fill. A plain
+        // Transform would leave the child clamped to the incoming constraints.
+        return FittedBox(
+          fit: BoxFit.fill,
+          child: SizedBox(
+            width: AppSizes.designWidth,
+            height: designHeight,
+            // Give descendants a MediaQuery matching the design canvas so
+            // height-relative layout (e.g. the 94vh hero) stays correct.
+            child: MediaQuery(
+              data: media.copyWith(
+                size: Size(AppSizes.designWidth, designHeight),
+              ),
               child: child,
             ),
           ),
