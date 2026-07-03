@@ -6,7 +6,7 @@
   --accent: #e50914;
   --focus: #ffffff;
   --radius: 10px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Varela Round', system-ui, sans-serif;
 }
 
 * {
@@ -68,19 +68,18 @@ body {
   right: 48px;
   z-index: 3;
   padding: 10px 20px;
-  border: 2px solid var(--muted);
-  border-radius: var(--radius);
-  background: transparent;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 .update-btn:hover,
 .update-btn--focused {
   background: var(--focus);
-  border-color: var(--focus);
   color: var(--bg);
 }
 

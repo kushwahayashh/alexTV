@@ -76,12 +76,10 @@ class _UpdateButtonState extends State<UpdateButton> {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
-            color: focused ? AppColors.focus : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppSizes.radius),
-            border: Border.all(
-              color: focused ? AppColors.focus : AppColors.muted,
-              width: 2,
-            ),
+            color: focused
+                ? AppColors.focus
+                : Colors.white.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
             _downloading ? 'Downloading…' : 'Update',

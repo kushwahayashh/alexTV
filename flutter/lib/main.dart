@@ -21,9 +21,9 @@ class AlexTvApp extends StatelessWidget {
       title: 'AlexTV',
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
-        // DM Sans applied app-wide. Inline TextStyles leave fontFamily unset,
-        // so they inherit DM Sans from this text theme.
-        textTheme: GoogleFonts.dmSansTextTheme(base.textTheme),
+        // Varela Round applied app-wide. Inline TextStyles leave fontFamily unset,
+        // so they inherit Varela Round from this text theme.
+        textTheme: GoogleFonts.varelaRoundTextTheme(base.textTheme),
       ),
       home: const _DesignScaler(child: Home()),
     );
