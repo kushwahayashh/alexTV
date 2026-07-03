@@ -1,0 +1,180 @@
+:root {
+  --bg: #0b0f14;
+  --surface: #141b24;
+  --text: #f2f5f8;
+  --muted: #93a1b0;
+  --accent: #e50914;
+  --focus: #ffffff;
+  --radius: 10px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  overflow: hidden; /* TV: no scrollbars; focus engine drives scrolling */
+}
+
+.screen-msg {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  color: var(--muted);
+  font-size: 1.25rem;
+}
+
+/* ---------- Home layout ---------- */
+.home {
+  height: 100vh;
+  overflow-y: auto;
+  /* Where a focused row settles from the top (used by scrollIntoView
+     block:'start'). Bigger = row sits lower = gentler lift. */
+  scroll-padding-top: 360px;
+  scrollbar-width: none;
+}
+.home::-webkit-scrollbar {
+  display: none;
+}
+
+.home__rails {
+  position: relative;
+  margin-top: -80px; /* rails overlap the base of the hero */
+  padding: 0 48px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  z-index: 2;
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  height: 94vh;
+  width: 100%;
+  overflow: hidden;
+}
+.hero--empty {
+  background: linear-gradient(180deg, #1a2430, var(--bg));
+}
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+  animation: heroFade 0.6s ease-out both;
+}
+@keyframes heroFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(11, 15, 20, 0.95) 0%, rgba(11, 15, 20, 0.4) 55%, transparent 100%),
+    linear-gradient(0deg, var(--bg) 2%, transparent 45%);
+}
+.hero__content {
+  position: absolute;
+  bottom: 112px;
+  left: 48px;
+  max-width: 46%;
+  z-index: 1;
+  animation: heroFade 0.6s ease-out both;
+}
+.hero__title {
+  font-size: 3.6rem;
+  line-height: 1.05;
+  margin: 0 0 14px;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
+}
+.hero__facts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.hero__overview {
+  color: #d7dee5;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- Rail ---------- */
+.rail__title {
+  font-size: 1.25rem;
+  margin: 0 0 14px;
+  font-weight: 700;
+}
+.rail__track {
+  display: flex;
+  gap: 16px;
+  /* Horizontal scroll for overflowing posters. Vertical padding gives the
+     focused poster's scale-up room to breathe without being clipped. */
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 24px 48px;
+  margin: -24px -48px;
+  scroll-padding: 0 48px;
+  scrollbar-width: none;
+}
+.rail__track::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- Poster ---------- */
+.poster {
+  position: relative;
+  flex: 0 0 auto;
+  width: 158px;
+  height: 237px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  outline: 3px solid transparent;
+}
+.poster--focused {
+  transform: scale(1.12);
+  outline-color: var(--focus);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.7);
+  z-index: 5;
+}
+.poster__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.poster__placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}

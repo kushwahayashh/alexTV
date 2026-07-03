@@ -1,0 +1,100 @@
+name: Build Android APK
+
+# Build the Android TV APK on CI (keeps it off your laptop).
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: # lets you trigger a build manually from the Actions tab
+
+# Cancel an in-progress run if you push again to the same branch.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+# Needed for the workflow to create/update the GitHub Release.
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.4'
+  # The Flutter project lives in the `flutter/` subfolder of the repo.
+  WORKING_DIR: flutter
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Java 17 — matches the project's sourceCompatibility / jvmTarget.
+      # `cache: gradle` restores the Gradle dependency cache between runs.
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # subosito/flutter-action with cache: true caches the Flutter SDK AND
+      # the pub package cache, so subsequent runs skip re-downloading both.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # Extra explicit cache for Gradle caches + wrapper, keyed on the gradle
+      # files. This is the single biggest speedup for repeat builds.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('flutter/android/**/*.gradle*', 'flutter/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      # Give the APK a stable name so every release has the same asset filename.
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/alexTV.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: alexTV-apk
+          path: flutter/build/app/outputs/flutter-apk/alexTV.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Auto-publish to a single rolling release. The tag/name stay the same
+      # every build, and the APK asset is overwritten each time.
+      - name: Publish to GitHub Release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: AlexTV Latest Build
+          body: |
+            Automated AlexTV Android TV build.
+            Commit: ${{ github.sha }}
+          files: flutter/build/app/outputs/flutter-apk/alexTV.apk
+          make_latest: true
+
