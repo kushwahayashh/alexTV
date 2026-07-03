@@ -34,36 +34,53 @@ class Hero extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Backdrop — keyed + AnimatedSwitcher so it fades on each rotation.
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 600),
+          // Backdrop — keyed so it remounts per title, replaying the fade-in.
+          _FadeIn(
+            key: ValueKey('bg-${m.id}'),
             child: m.backdropPath != null
                 ? SizedBox.expand(
-                    key: ValueKey(m.id),
-                    // expand forces the image to fill; cover then crops it so
-                    // there's no empty space at the sides.
                     child: Image.network(
                       Img.backdrop(m.backdropPath),
                       fit: BoxFit.cover,
-                      alignment: const Alignment(0, -0.64), // ~ object-position 18%
+                      alignment: const Alignment(0, -0.64),
                     ),
                   )
-                : const SizedBox.shrink(key: ValueKey('empty')),
+                : const SizedBox.shrink(),
           ),
           // Scrim: left-to-right + bottom-up fade to the page background.
           const _Scrim(),
-          // Content, also cross-fading per title.
+          // Content, also fade-in per title.
           Positioned(
             left: AppSizes.pagePadding,
             bottom: 112,
             width: MediaQuery.of(context).size.width * 0.46,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
-              child: _HeroContent(key: ValueKey(m.id), media: m),
+            child: _FadeIn(
+              key: ValueKey('content-${m.id}'),
+              child: _HeroContent(media: m),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Plays a one-shot opacity 0 → 1 fade-in on mount, matching the React
+/// heroFade CSS keyframes. The parent keys this widget so it remounts (and
+/// replays the animation) each time the title changes.
+class _FadeIn extends StatelessWidget {
+  final Widget child;
+  const _FadeIn({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) =>
+          Opacity(opacity: opacity, child: child),
+      child: child,
     );
   }
 }

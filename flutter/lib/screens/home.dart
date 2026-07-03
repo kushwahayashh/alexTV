@@ -43,7 +43,7 @@ class _HomeState extends State<Home> {
         // Feature trending items that actually have a backdrop to show.
         _featured = (data.isNotEmpty ? data[0].items : <api.Media>[])
             .where((m) => m.backdropPath != null)
-            .take(6)
+            .take(10)
             .toList();
         _status = _Status.ready;
       });

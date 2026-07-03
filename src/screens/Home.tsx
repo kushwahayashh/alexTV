@@ -20,7 +20,7 @@ export function Home() {
         setRails(data)
         // Feature the trending items that actually have a backdrop to show.
         setFeatured(
-          (data[0]?.items ?? []).filter((m) => m.backdropPath).slice(0, 6),
+          (data[0]?.items ?? []).filter((m) => m.backdropPath).slice(0, 10),
         )
         setStatus('ready')
       })
