@@ -21,7 +21,7 @@ class Hero extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A2430), AppColors.bg],
+            colors: [Color(0xFF16161A), AppColors.bg],
           ),
         ),
       );

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Design tokens ported 1:1 from the React prototype's CSS `:root` variables.
 class AppColors {
-  static const bg = Color(0xFF0B0F14);
-  static const surface = Color(0xFF141B24);
+  static const bg = Color(0xFF08080A);
+  static const surface = Color(0xFF16161A);
   static const text = Color(0xFFF2F5F8);
-  static const muted = Color(0xFF93A1B0);
+  static const muted = Color(0xFF8B8B94);
   static const accent = Color(0xFFE50914);
   static const focus = Color(0xFFFFFFFF);
 }

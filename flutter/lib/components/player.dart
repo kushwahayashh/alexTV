@@ -4,6 +4,7 @@ import '../api/stream.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
+import 'video_player_screen.dart';
 
 enum _Phase { loading, files, links, playing, error }
 
@@ -32,6 +33,7 @@ class _PlayerState extends State<Player> {
   List<VideoFile> _files = [];
   List<StreamLink> _links = [];
   String _error = '';
+  String? _streamUrl;
 
   @override
   void initState() {
@@ -89,9 +91,10 @@ class _PlayerState extends State<Player> {
   }
 
   void _pickLink(StreamLink link) {
-    // TODO: wire up the video player.
-    debugPrint('PLAY LINK: ${link.proxiedUrl}');
-    setState(() => _phase = _Phase.playing);
+    setState(() {
+      _streamUrl = link.proxiedUrl;
+      _phase = _Phase.playing;
+    });
   }
 
   @override
@@ -103,6 +106,17 @@ class _PlayerState extends State<Player> {
 
   @override
   Widget build(BuildContext context) {
+    // When playing, render the fullscreen video player directly (it manages
+    // its own FocusController + key handling).
+    if (_phase == _Phase.playing && _streamUrl != null) {
+      return VideoPlayerScreen(
+        key: const ValueKey('player'),
+        url: _streamUrl!,
+        title: widget.media.title,
+        onClose: widget.onClose,
+      );
+    }
+
     return FocusScopeProvider(
       controller: _focus,
       child: Focus(
@@ -151,7 +165,7 @@ class _PlayerState extends State<Player> {
               ),
           ],
         ),
-      _Phase.playing => _PlayingPlaceholder(onClose: widget.onClose),
+      _Phase.playing => const SizedBox.shrink(),
       _Phase.error => _ErrorModal(error: _error, onClose: widget.onClose),
     };
   }
@@ -461,49 +475,6 @@ class _ErrorModalState extends State<_ErrorModal> {
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: focused ? AppColors.bg : AppColors.text,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/* ---------- Playing placeholder (video player not yet implemented) ---------- */
-class _PlayingPlaceholder extends StatelessWidget {
-  final VoidCallback onClose;
-  const _PlayingPlaceholder({required this.onClose});
-
-  @override
-  Widget build(BuildContext context) {
-    return _modalShell(context,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Video player not implemented yet.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: onClose,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.focus,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Text(
-                'Back',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.bg,
                 ),
               ),
             ),

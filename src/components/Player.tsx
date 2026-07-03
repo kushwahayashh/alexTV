@@ -231,11 +231,104 @@ function VideoPlayer({ url }: { url: string }) {
       <video
         ref={videoRef}
         className="player-video"
-        controls
         autoPlay
+        playsInline
       />
       {usingHls && <div className="player-badge">HLS</div>}
+      <PlayerControls title="Inception" />
     </div>
+  )
+}
+
+/* ---------- Player controls overlay ---------- */
+const SEEK_STEP = 0.05 // 5% per arrow press
+
+function fmtTime(sec: number) {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = Math.floor(sec % 60)
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function PlayerControls({ title }: { title: string }) {
+  const [progress, setProgress] = useState(0.32) // 0–1
+  const duration = 7695 // 2:08:15 in seconds (placeholder)
+
+  const { ref: seekRef, focused: seekFocused } = useFocusable({ onSelect: () => {} })
+  const { ref: playRef, focused: playFocused } = useFocusable({ onSelect: () => {} })
+  const { ref: subRef, focused: subFocused } = useFocusable({ onSelect: () => {} })
+  const { ref: audioRef, focused: audioFocused } = useFocusable({ onSelect: () => {} })
+
+  // When the seekbar is focused, intercept left/right to seek instead of
+  // letting the FocusEngine move focus to another control.
+  useEffect(() => {
+    if (!seekFocused) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        e.stopPropagation()
+        setProgress((p) => Math.max(0, p - SEEK_STEP))
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        e.stopPropagation()
+        setProgress((p) => Math.min(1, p + SEEK_STEP))
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [seekFocused])
+
+  const currentSec = progress * duration
+  const pct = `${(progress * 100).toFixed(1)}%`
+
+  return (
+    <>
+      {/* Top bar: title */}
+      <div className="player-top">
+        <div className="player-top__title">{title}</div>
+      </div>
+
+      {/* Bottom bar: seek + controls */}
+      <div className="player-bottom">
+        <div className="player-seek">
+          <span className="player-seek__time">{fmtTime(currentSec)}</span>
+          <div
+            ref={seekRef as React.RefObject<HTMLDivElement>}
+            className={`player-seek__bar${seekFocused ? ' player-seek__bar--focused' : ''}`}
+          >
+            <div className="player-seek__fill" style={{ width: pct }} />
+            <div className="player-seek__knob" style={{ left: pct }} />
+          </div>
+          <span className="player-seek__time">{fmtTime(duration)}</span>
+        </div>
+
+        <div className="player-controls-row">
+          <button
+            ref={playRef as React.RefObject<HTMLButtonElement>}
+            className={`player-pill-btn${playFocused ? ' player-pill-btn--focused' : ''}`}
+            type="button"
+          >
+            Play
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            ref={subRef as React.RefObject<HTMLButtonElement>}
+            className={`player-pill-btn${subFocused ? ' player-pill-btn--focused' : ''}`}
+            type="button"
+          >
+            Subtitles
+          </button>
+          <button
+            ref={audioRef as React.RefObject<HTMLButtonElement>}
+            className={`player-pill-btn${audioFocused ? ' player-pill-btn--focused' : ''}`}
+            type="button"
+          >
+            Audio
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 
