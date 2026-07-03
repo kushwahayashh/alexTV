@@ -35,7 +35,7 @@ class Hero extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           // Backdrop — keyed so it remounts per title, replaying the fade-in.
-          _FadeIn(
+          FadeIn(
             key: ValueKey('bg-${m.id}'),
             child: m.backdropPath != null
                 ? SizedBox.expand(
@@ -48,13 +48,13 @@ class Hero extends StatelessWidget {
                 : const SizedBox.shrink(),
           ),
           // Scrim: left-to-right + bottom-up fade to the page background.
-          const _Scrim(),
+          const Scrim(),
           // Content, also fade-in per title.
           Positioned(
             left: AppSizes.pagePadding,
             bottom: 112,
             width: MediaQuery.of(context).size.width * 0.46,
-            child: _FadeIn(
+            child: FadeIn(
               key: ValueKey('content-${m.id}'),
               child: _HeroContent(media: m),
             ),
@@ -68,9 +68,9 @@ class Hero extends StatelessWidget {
 /// Plays a one-shot opacity 0 → 1 fade-in on mount, matching the React
 /// heroFade CSS keyframes. The parent keys this widget so it remounts (and
 /// replays the animation) each time the title changes.
-class _FadeIn extends StatelessWidget {
+class FadeIn extends StatelessWidget {
   final Widget child;
-  const _FadeIn({super.key, required this.child});
+  const FadeIn({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -85,8 +85,8 @@ class _FadeIn extends StatelessWidget {
   }
 }
 
-class _Scrim extends StatelessWidget {
-  const _Scrim();
+class Scrim extends StatelessWidget {
+  const Scrim({super.key});
 
   @override
   Widget build(BuildContext context) {

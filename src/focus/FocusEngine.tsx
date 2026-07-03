@@ -26,6 +26,7 @@ type FocusableEntry = {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
+  active: boolean
 }
 
 type FocusContextValue = {
@@ -33,6 +34,7 @@ type FocusContextValue = {
   unregister: (id: string) => void
   focusId: string | null
   setFocus: (id: string) => void
+  setActive: (id: string, active: boolean) => void
 }
 
 const FocusContext = createContext<FocusContextValue | null>(null)
@@ -69,6 +71,7 @@ function findNext(
   for (const entry of entries.values()) {
     if (entry.id === currentId) continue
     if (entry.isHeader) continue // header reached only via the explicit Up-from-hero path
+    if (!entry.active) continue // skip elements behind a modal overlay
     const to = rectOf(entry.element)
 
     const dx = to.cx - from.cx
@@ -130,6 +133,7 @@ export function FocusProvider({
     let first: FocusableEntry | null = null
     for (const e of entries.current.values()) {
       if (e.isHeader) continue // header isn't part of the content grid
+      if (!e.active) continue
       if (
         !first ||
         e.element.compareDocumentPosition(first.element) &
@@ -167,6 +171,11 @@ export function FocusProvider({
   const unregister = useCallback((id: string) => {
     entries.current.delete(id)
     headerIdsRef.current.delete(id)
+  }, [])
+
+  const setActive = useCallback((id: string, active: boolean) => {
+    const entry = entries.current.get(id)
+    if (entry) entry.active = active
   }, [])
 
   // Leftmost header in document order — where focus enters when pressing Up
@@ -222,19 +231,23 @@ export function FocusProvider({
         e.preventDefault()
         const cur = focusIdRef.current
         const dir = dirMap[e.key]
+        // Entry may be stale (leftover from a previous screen). Treat it as
+        // no-focus so the first keypress on the new screen seeds correctly.
+        const curAlive = cur != null && entries.current.has(cur)
+
         // Header focused: left/right moves between headers, down drops to hero.
-        if (cur != null && headerIdsRef.current.has(cur)) {
+        if (curAlive && headerIdsRef.current.has(cur!)) {
           if (dir === 'down') {
             releaseToTop()
           } else if (dir === 'left' || dir === 'right') {
-            const next = nextHeader(cur, dir)
+            const next = nextHeader(cur!, dir)
             if (next) setFocus(next)
           }
           return
         }
-        // Nothing focused yet (hero showing). Up reaches the first header; any
+        // Nothing focused yet (or stale). Up reaches the first header; any
         // other direction enters the content grid at the first card.
-        if (!cur) {
+        if (!curAlive) {
           if (dir === 'up') {
             const first = firstHeader()
             if (first) setFocus(first.id)
@@ -244,7 +257,7 @@ export function FocusProvider({
           if (first) setFocus(first.id)
           return
         }
-        const next = findNext(entries.current, cur, dir)
+        const next = findNext(entries.current, cur!, dir)
         if (next) {
           setFocus(next)
         } else if (dir === 'up') {
@@ -272,7 +285,7 @@ export function FocusProvider({
   }, [setFocus, onBack, firstInDomOrder, releaseToTop, firstHeader, nextHeader])
 
   return (
-    <FocusContext.Provider value={{ register, unregister, focusId, setFocus }}>
+    <FocusContext.Provider value={{ register, unregister, focusId, setFocus, setActive }}>
       {children}
     </FocusContext.Provider>
   )
@@ -287,6 +300,7 @@ export function useFocusable(opts?: {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
+  active?: boolean
 }) {
   const ctx = useContext(FocusContext)
   if (!ctx) throw new Error('useFocusable must be used within a FocusProvider')
@@ -299,18 +313,34 @@ export function useFocusable(opts?: {
   const optsRef = useRef(opts)
   optsRef.current = opts
 
+  // Keep stable refs to context methods so the layout effect doesn't re-run
+  // on every focus change (which would unregister + re-register every
+  // focusable element, creating a window where entries vanish).
+  const registerRef = useRef(ctx.register)
+  registerRef.current = ctx.register
+  const unregisterRef = useRef(ctx.unregister)
+  unregisterRef.current = ctx.unregister
+  const setActiveRef = useRef(ctx.setActive)
+  setActiveRef.current = ctx.setActive
+
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    ctx.register({
+    registerRef.current({
       id,
       element: el,
       onSelect: () => optsRef.current?.onSelect?.(),
       onFocus: () => optsRef.current?.onFocus?.(),
       isHeader: optsRef.current?.isHeader,
+      active: optsRef.current?.active !== false,
     })
-    return () => ctx.unregister(id)
-  }, [ctx, id])
+    return () => unregisterRef.current(id)
+  }, [id])
+
+  // Sync `active` changes without re-registering (keeps element ref stable).
+  useEffect(() => {
+    setActiveRef.current(id, opts?.active !== false)
+  }, [id, opts?.active])
 
   return {
     ref: ref as React.RefObject<any>,

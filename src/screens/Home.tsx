@@ -6,7 +6,7 @@ import { HeaderButton } from '../components/HeaderButton'
 
 const HERO_ROTATE_MS = 10000
 
-export function Home() {
+export function Home({ onSelect }: { onSelect: (m: Media) => void }) {
   const [rails, setRails] = useState<RailData[]>([])
   const [featured, setFeatured] = useState<Media[]>([])
   const [heroIndex, setHeroIndex] = useState(0)
@@ -67,7 +67,7 @@ export function Home() {
           <Rail
             key={rail.title}
             rail={rail}
-            onSelect={(m) => console.log('SELECT', m.title)}
+            onSelect={onSelect}
           />
         ))}
       </div>

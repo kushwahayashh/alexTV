@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'api/tmdb.dart' as api;
 import 'screens/home.dart';
+import 'screens/details.dart';
 import 'theme.dart';
 
 void main() {
@@ -25,8 +27,32 @@ class AlexTvApp extends StatelessWidget {
         // so they inherit Varela Round from this text theme.
         textTheme: GoogleFonts.varelaRoundTextTheme(base.textTheme),
       ),
-      home: const _DesignScaler(child: Home()),
+      home: const _DesignScaler(child: _AppShell()),
     );
+  }
+}
+
+/// Routes between Home and Details, mirroring the React App.tsx `selected`
+/// state. Pressing Back on Details clears the selection, returning to Home.
+class _AppShell extends StatefulWidget {
+  const _AppShell();
+
+  @override
+  State<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<_AppShell> {
+  api.Media? _selected;
+
+  void _onSelect(api.Media m) => setState(() => _selected = m);
+  void _onBack() => setState(() => _selected = null);
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _selected;
+    return selected != null
+        ? Details(media: selected, onBack: _onBack)
+        : Home(onSelect: _onSelect);
   }
 }
 

@@ -11,7 +11,8 @@ import '../theme.dart';
 const _heroRotateMs = 10000;
 
 class Home extends StatefulWidget {
-  const Home({super.key});
+  final void Function(api.Media) onSelect;
+  const Home({super.key, required this.onSelect});
 
   @override
   State<Home> createState() => _HomeState();
@@ -154,7 +155,7 @@ class _HomeState extends State<Home> {
                         Rail(
                           rail: rail,
                           pageController: _pageController,
-                          onSelect: (m) => debugPrint('SELECT ${m.title}'),
+                          onSelect: widget.onSelect,
                         ),
                         const SizedBox(height: AppSizes.railGap),
                       ],

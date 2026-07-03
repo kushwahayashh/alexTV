@@ -72,6 +72,9 @@ class FocusController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Programmatically focus a registered entry (mirrors the React `focusSelf`).
+  void requestFocus(int id) => _setFocus(id);
+
   /// First focusable in visual order (topmost, then leftmost) — where focus
   /// enters when nothing is focused yet (e.g. pressing Down on the hero).
   int? _firstInOrder() {
