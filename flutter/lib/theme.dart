@@ -12,10 +12,11 @@ class AppColors {
 
 class AppSizes {
   // Fixed logical width the whole UI is laid out at, then scaled to fill the
-  // real screen. Keeps the look identical across the browser dev window and
+  // real screen. Keeps the look consistent across the browser dev window and
   // actual TVs (which report a narrow logical canvas at a high pixel ratio,
-  // making fixed-size widgets look zoomed in). Tune this to zoom in/out.
-  static const designWidth = 1280.0;
+  // making fixed-size widgets look zoomed in). Larger value => more content
+  // fits => more zoomed out. 1920 matches a 1080p TV's native resolution.
+  static const designWidth = 1920.0;
 
   static const radius = 10.0;
   static const pagePadding = 48.0;
