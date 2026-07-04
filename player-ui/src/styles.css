@@ -1,0 +1,276 @@
+:root {
+  --bg: #08080a;
+  --surface: #16161a;
+  --text: #f2f5f8;
+  --muted: #8b8b94;
+  --accent: #e50914;
+  --focus: #ffffff;
+  --radius: 10px;
+  font-family: 'Varela Round', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  overflow: hidden;
+}
+
+/* ---------- Stage ---------- */
+.player-stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+/* Backdrop image fills the stage like a paused video frame */
+.player-mock-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* ---------- Center paused indicator ---------- */
+.player-center-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  font-size: 2.4rem;
+  color: var(--text);
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ---------- Top bar ---------- */
+.player-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+  z-index: 4;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.player-top--hidden {
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+}
+.player-top__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Bottom bar ---------- */
+.player-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 28px 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
+  z-index: 4;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.player-bottom--hidden {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+/* ---------- Seek bar ---------- */
+.player-seek {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.player-seek__times {
+  display: flex;
+  justify-content: space-between;
+}
+.player-seek__time {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.player-seek__bar {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  transition: background 0.16s ease, height 0.16s ease;
+}
+.player-seek__bar--focused {
+  background: rgba(255, 255, 255, 0.35);
+  height: 10px;
+}
+.player-seek__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+}
+/* Vertical playhead line — visible only when the seekbar is focused */
+.player-seek__playhead {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--focus);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.player-seek__bar--focused .player-seek__playhead {
+  opacity: 1;
+}
+
+/* ---------- Controls row ---------- */
+.player-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+}
+
+/* ---------- Circular icon button (close, etc.) ---------- */
+.player-circle-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  outline: 3px solid transparent;
+}
+.player-circle-btn:hover,
+.player-circle-btn--focused {
+  background: var(--focus);
+  color: var(--bg);
+  transform: scale(1.08);
+}
+
+/* ---------- Pill-shaped label button (Play, Subtitles, Audio) ---------- */
+.player-pill-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  outline: 3px solid transparent;
+}
+.player-pill-btn:hover,
+.player-pill-btn--focused {
+  background: var(--focus);
+  color: var(--bg);
+  transform: scale(1.05);
+}
+
+/* ---------- Pop-up menus (Subtitles / Audio) ---------- */
+.player-menu {
+  position: absolute;
+  bottom: 140px;
+  right: 40px;
+  min-width: 260px;
+  background: rgba(20, 20, 24, 0.92);
+  backdrop-filter: blur(16px);
+  border-radius: 14px;
+  padding: 16px 12px;
+  z-index: 5;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  animation: menuIn 0.18s ease-out both;
+}
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.player-menu__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 4px 14px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 6px;
+}
+.player-menu__item {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.player-menu__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.player-menu__item--active {
+  color: var(--accent);
+  font-weight: 700;
+}
+.player-menu__item--active::before {
+  content: '✓ ';
+  color: var(--accent);
+}
