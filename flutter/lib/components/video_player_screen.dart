@@ -59,10 +59,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _hideTimer;
   static const _hideDelay = Duration(seconds: 4);
 
-  // Mock menus
-  bool _subtitlesOpen = false;
-  bool _audioOpen = false;
-
   // Focusable IDs
   late final int _seekId;
   late final int _subId;
@@ -107,18 +103,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _registerFocusables() {
     _seekId = _focus.register(onSelect: _togglePlay);
-    _subId = _focus.register(onSelect: () {
-      setState(() {
-        _subtitlesOpen = !_subtitlesOpen;
-        _audioOpen = false;
-      });
-    });
-    _audioId = _focus.register(onSelect: () {
-      setState(() {
-        _audioOpen = !_audioOpen;
-        _subtitlesOpen = false;
-      });
-    });
+    _subId = _focus.register(onSelect: () {});
+    _audioId = _focus.register(onSelect: () {});
   }
 
   void _bumpActivity() {
@@ -128,8 +114,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (mounted) {
         setState(() {
           _controlsVisible = false;
-          _subtitlesOpen = false;
-          _audioOpen = false;
         });
       }
     });
@@ -231,18 +215,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
     }
 
-    // Back/Escape: close open menu first, then close player.
+    // Back/Escape: close player.
     if (event.logicalKey == LogicalKeyboardKey.escape ||
         event.logicalKey == LogicalKeyboardKey.backspace ||
         event.logicalKey == LogicalKeyboardKey.goBack) {
-      if (_subtitlesOpen) {
-        setState(() => _subtitlesOpen = false);
-        return KeyEventResult.handled;
-      }
-      if (_audioOpen) {
-        setState(() => _audioOpen = false);
-        return KeyEventResult.handled;
-      }
       widget.onClose();
       return KeyEventResult.handled;
     }
@@ -379,10 +355,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               child: _buildBottomBar(progress, controller),
             ),
           ),
-          // Subtitles menu (mock)
-          if (_subtitlesOpen) _buildMenu('Subtitles', ['Off', 'English', 'Spanish', 'French']),
-          // Audio menu (mock)
-          if (_audioOpen) _buildMenu('Audio', ['English 5.1', 'English Stereo', 'Spanish', 'Director Commentary']),
         ],
       ),
     );
@@ -497,7 +469,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   widthFactor: pct / 100,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: Colors.white.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -566,74 +538,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildMenu(String title, List<String> items) {
-    return Positioned(
-      bottom: 140,
-      right: 40,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: 260,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xEB141418),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x99000000),
-                blurRadius: 40,
-                offset: Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 14, right: 14, bottom: 10),
-                child: Text(
-                  title.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 12.8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.08 * 12.8,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-              for (int i = 0; i < items.length; i++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(
-                    children: [
-                      if (i == 0)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 8),
-                          child: Icon(Icons.check, size: 16, color: AppColors.accent),
-                        ),
-                      Text(
-                        items[i],
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w600,
-                          color: i == 0 ? AppColors.accent : AppColors.text,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Center play icon shown when paused.

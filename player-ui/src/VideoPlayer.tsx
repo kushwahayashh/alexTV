@@ -52,17 +52,11 @@ export function VideoPlayer({
   const [isPlaying, setIsPlaying] = useState(true)
   const [focused, setFocused] = useState<ControlId>('seek')
   const [controlsVisible, setControlsVisible] = useState(true)
-  const [subtitlesOpen, setSubtitlesOpen] = useState(false)
-  const [audioOpen, setAudioOpen] = useState(false)
   const hideTimer = useRef<number | null>(null)
 
   // Refs so the keyboard listener never needs to re-register.
   const focusedRef = useRef(focused)
   focusedRef.current = focused
-  const subtitlesOpenRef = useRef(subtitlesOpen)
-  subtitlesOpenRef.current = subtitlesOpen
-  const audioOpenRef = useRef(audioOpen)
-  audioOpenRef.current = audioOpen
 
   // Mock playback timer — advances position when playing.
   useEffect(() => {
@@ -79,8 +73,6 @@ export function VideoPlayer({
     if (hideTimer.current) window.clearTimeout(hideTimer.current)
     hideTimer.current = window.setTimeout(() => {
       setControlsVisible(false)
-      setSubtitlesOpen(false)
-      setAudioOpen(false)
     }, HIDE_DELAY)
   }, [])
 
@@ -122,14 +114,6 @@ export function VideoPlayer({
 
     function trigger(id: ControlId) {
       switch (id) {
-        case 'subtitles':
-          setSubtitlesOpen((s) => !s)
-          setAudioOpen(false)
-          break
-        case 'audio':
-          setAudioOpen((a) => !a)
-          setSubtitlesOpen(false)
-          break
         case 'seek':
           setIsPlaying((p) => !p)
           break
@@ -179,14 +163,6 @@ export function VideoPlayer({
         case 'Escape':
         case 'Backspace':
           e.preventDefault()
-          if (subtitlesOpenRef.current) {
-            setSubtitlesOpen(false)
-            return
-          }
-          if (audioOpenRef.current) {
-            setAudioOpen(false)
-            return
-          }
           onClose()
           return
       }
@@ -249,30 +225,6 @@ export function VideoPlayer({
           </button>
         </div>
       </div>
-
-      {/* Subtitles menu (mock) */}
-      {subtitlesOpen && (
-        <div className="player-menu">
-          <div className="player-menu__title">Subtitles</div>
-          {['Off', 'English', 'Spanish', 'French'].map((s, i) => (
-            <div key={s} className={`player-menu__item${i === 0 ? ' player-menu__item--active' : ''}`}>
-              {s}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Audio menu (mock) */}
-      {audioOpen && (
-        <div className="player-menu">
-          <div className="player-menu__title">Audio</div>
-          {['English 5.1', 'English Stereo', 'Spanish', 'Director Commentary'].map((s, i) => (
-            <div key={s} className={`player-menu__item${i === 0 ? ' player-menu__item--active' : ''}`}>
-              {s}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
