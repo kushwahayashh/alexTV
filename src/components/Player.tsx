@@ -63,7 +63,7 @@ export function Player({ media, onClose }: { media: Media; onClose: () => void }
 
   // Play a given stream link.
   function playLink(link: StreamLink) {
-    setStreamUrl(link.url)
+    setStreamUrl(link.proxiedUrl || link.url)
     setPhase('playing')
   }
 
@@ -176,10 +176,11 @@ function QualityPicker({
   links: StreamLink[]
   onPick: (l: StreamLink) => void
 }) {
+  const playable = links.filter((l) => l.ext !== 'mp4' || l.quality.toUpperCase() !== 'ORG')
   return (
     <div className="player-modal">
       <div className="player-list">
-        {links.map((link, i) => (
+        {playable.map((link, i) => (
           <PlayerItem
             key={i}
             label={link.quality}

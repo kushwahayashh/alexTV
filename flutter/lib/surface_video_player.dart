@@ -26,12 +26,13 @@ class SurfaceVideoPlayerController {
 
   static Widget view({
     required String url,
+    String ext = '',
     bool autoPlay = true,
     required void Function(SurfaceVideoPlayerController) onCreated,
   }) {
     return AndroidView(
       viewType: _viewType,
-      creationParams: {'url': url, 'autoPlay': autoPlay},
+      creationParams: {'url': url, 'ext': ext, 'autoPlay': autoPlay},
       creationParamsCodec: const StandardMessageCodec(),
       onPlatformViewCreated: (id) {
         final channel = MethodChannel('$_viewType/$id');

@@ -34,6 +34,7 @@ class _PlayerState extends State<Player> {
   List<StreamLink> _links = [];
   String _error = '';
   String? _streamUrl;
+  String _streamExt = '';
 
   @override
   void initState() {
@@ -93,6 +94,7 @@ class _PlayerState extends State<Player> {
   void _pickLink(StreamLink link) {
     setState(() {
       _streamUrl = link.proxiedUrl.isNotEmpty ? link.proxiedUrl : link.url;
+      _streamExt = link.ext;
       _phase = _Phase.playing;
     });
   }
@@ -113,30 +115,36 @@ class _PlayerState extends State<Player> {
         key: const ValueKey('player'),
         url: _streamUrl!,
         title: widget.media.title,
+        ext: _streamExt,
         onClose: widget.onClose,
       );
     }
 
-    return FocusScopeProvider(
-      controller: _focus,
-      child: Focus(
-        focusNode: _keyboardNode,
-        autofocus: true,
-        onKeyEvent: (_, event) =>
-            _focus.handleKey(event, _handleBack, null),
-        child: Stack(
-  children: [
-          // Dim + blur overlay.
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(color: Colors.black.withValues(alpha: 0.6)),
-            ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: FocusScopeProvider(
+        controller: _focus,
+        child: Focus(
+          focusNode: _keyboardNode,
+          autofocus: true,
+          onKeyEvent: (_, event) => _focus.handleKey(event, _handleBack, null),
+          child: Stack(
+            children: [
+              // Dim + blur overlay.
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(color: Colors.black.withValues(alpha: 0.6)),
+                ),
+              ),
+              Center(child: _buildModal()),
+            ],
           ),
-          Center(child: _buildModal()),
-        ],
+        ),
       ),
-    ),
     );
   }
 
@@ -144,27 +152,28 @@ class _PlayerState extends State<Player> {
     return switch (_phase) {
       _Phase.loading => const _LoadingModal(),
       _Phase.files => _PickerModal(
-          key: const ValueKey('files'),
-          items: [
-            for (final f in _files)
-              _PickerData(
-                label: f.fileName,
-                meta: '${f.resLabel} · ${f.fileSize}',
-                onSelect: () => _pickFile(f),
-              ),
-          ],
-        ),
+        key: const ValueKey('files'),
+        items: [
+          for (final f in _files)
+            _PickerData(
+              label: f.fileName,
+              meta: '${f.resLabel} · ${f.fileSize}',
+              onSelect: () => _pickFile(f),
+            ),
+        ],
+      ),
       _Phase.links => _PickerModal(
-          key: const ValueKey('links'),
-          items: [
-            for (final l in _links)
+        key: const ValueKey('links'),
+        items: [
+          for (final l in _links)
+            if (!(l.ext == 'mp4' && l.quality.toUpperCase() == 'ORG'))
               _PickerData(
                 label: l.quality,
                 meta: '${l.ext} · ${l.speed}',
                 onSelect: () => _pickLink(l),
               ),
-          ],
-        ),
+        ],
+      ),
       _Phase.playing => const SizedBox.shrink(),
       _Phase.error => _ErrorModal(error: _error, onClose: widget.onClose),
     };
@@ -176,8 +185,11 @@ class _PickerData {
   final String label;
   final String meta;
   final VoidCallback onSelect;
-  const _PickerData(
-      {required this.label, required this.meta, required this.onSelect});
+  const _PickerData({
+    required this.label,
+    required this.meta,
+    required this.onSelect,
+  });
 }
 
 /* ---------- Focusable list item ---------- */
@@ -308,7 +320,8 @@ class _LoadingModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _modalShell(context,
+    return _modalShell(
+      context,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -383,7 +396,8 @@ class _PickerModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _modalShell(context,
+    return _modalShell(
+      context,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -442,7 +456,8 @@ class _ErrorModalState extends State<_ErrorModal> {
     final controller = FocusScopeProvider.of(context);
     final focused = controller.isFocused(_id);
 
-    return _modalShell(context,
+    return _modalShell(
+      context,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

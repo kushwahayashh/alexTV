@@ -29,12 +29,14 @@ import '../theme.dart';
 class VideoPlayerScreen extends StatefulWidget {
   final String url;
   final String title;
+  final String ext;
   final VoidCallback onClose;
 
   const VideoPlayerScreen({
     super.key,
     required this.url,
     required this.title,
+    this.ext = '',
     required this.onClose,
   });
 
@@ -96,7 +98,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _mockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || !_isPlaying) return;
       setState(() {
-        _position = _position >= _duration ? _duration : _position + const Duration(seconds: 1);
+        _position = _position >= _duration
+            ? _duration
+            : _position + const Duration(seconds: 1);
       });
     });
   }
@@ -122,22 +126,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _onControllerCreated(SurfaceVideoPlayerController controller) {
     _nativeController = controller;
 
-    controller.ready.then((_) {
-      if (!mounted) return;
-      _duration = controller.duration;
-      _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
-        if (!mounted) {
-          _positionTimer?.cancel();
-          return;
-        }
-        _position = await controller.getPosition();
-        setState(() {});
-      });
-      setState(() => _initialized = true);
-    }).catchError((e) {
-      if (!mounted) return;
-      setState(() => _error = 'Failed to load video: $e');
-    });
+    controller.ready
+        .then((_) {
+          if (!mounted) return;
+          _duration = controller.duration;
+          _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (
+            _,
+          ) async {
+            if (!mounted) {
+              _positionTimer?.cancel();
+              return;
+            }
+            _position = await controller.getPosition();
+            setState(() {});
+          });
+          setState(() => _initialized = true);
+        })
+        .catchError((e) {
+          if (!mounted) return;
+          setState(() => _error = 'Failed to load video: $e');
+        });
 
     _stateSub = controller.stateStream.listen((state) {
       if (!mounted) return;
@@ -175,8 +183,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _position = pos < Duration.zero
             ? Duration.zero
             : pos > _duration
-                ? _duration
-                : pos;
+            ? _duration
+            : pos;
       });
       return;
     }
@@ -186,8 +194,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final clamped = pos < Duration.zero
         ? Duration.zero
         : pos > _duration
-            ? _duration
-            : pos;
+        ? _duration
+        : pos;
     await c.seekTo(clamped);
     // Update locally so the UI reflects the seek immediately.
     setState(() => _position = clamped);
@@ -230,7 +238,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     final s = d.inSeconds.remainder(60);
-    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    if (h > 0) {
+      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
@@ -251,42 +261,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FocusScopeProvider(
-      controller: _focus,
-      child: Focus(
-        focusNode: _keyboardNode,
-        autofocus: true,
-        onKeyEvent: _handleKey,
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: SizedBox.expand(
-            child: _error != null
-                ? _buildError()
-                : Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Native SurfaceView video player (Android only)
-                      if (!kIsWeb)
-                        SurfaceVideoPlayerController.view(
-                          url: widget.url,
-                          autoPlay: true,
-                          onCreated: _onControllerCreated,
-                        ),
-                      // Center paused indicator
-                      if (_initialized && !_isPlaying)
-                        const Center(
-                          child: _PausedIndicator(),
-                        ),
-                      // Controls overlay (only after initialized)
-                      if (_initialized)
-                        Builder(builder: _buildControls),
-                      // Loading spinner
-                      if (!_initialized)
-                        const Center(
-                          child: CircularProgressIndicator(color: AppColors.text),
-                        ),
-                    ],
-                  ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) widget.onClose();
+      },
+      child: FocusScopeProvider(
+        controller: _focus,
+        child: Focus(
+          focusNode: _keyboardNode,
+          autofocus: true,
+          onKeyEvent: _handleKey,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: SizedBox.expand(
+              child: _error != null
+                  ? _buildError()
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Native SurfaceView video player (Android only)
+                        if (!kIsWeb)
+                          SurfaceVideoPlayerController.view(
+                            url: widget.url,
+                            ext: widget.ext,
+                            autoPlay: true,
+                            onCreated: _onControllerCreated,
+                          ),
+                        // Center paused indicator
+                        if (_initialized && !_isPlaying)
+                          const Center(child: _PausedIndicator()),
+                        // Controls overlay (only after initialized)
+                        if (_initialized) Builder(builder: _buildControls),
+                        // Loading spinner
+                        if (!_initialized)
+                          const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.text,
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
@@ -381,7 +397,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             fontWeight: FontWeight.w700,
             color: AppColors.text,
             shadows: [
-              Shadow(color: Color(0x99000000), blurRadius: 8, offset: Offset(0, 2)),
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
             ],
           ),
         ),
@@ -537,7 +557,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
     );
   }
-
 }
 
 /// Center play icon shown when paused.

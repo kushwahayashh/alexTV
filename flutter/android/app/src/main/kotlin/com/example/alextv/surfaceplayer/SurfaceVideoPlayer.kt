@@ -5,6 +5,7 @@ import android.net.Uri
 import android.view.SurfaceView
 import android.view.ViewGroup
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -49,8 +50,17 @@ class SurfaceVideoPlayer(
         exoPlayer.setVideoSurfaceView(surfaceView)
 
         val url = args["url"] as? String
+        val ext = (args["ext"] as? String)?.lowercase() ?: ""
         if (url != null) {
-            val mediaItem = MediaItem.fromUri(Uri.parse(url))
+            val mimeType = when {
+                ext == "m3u8" -> MimeTypes.APPLICATION_M3U8
+                url.contains(".m3u8", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
+                else -> null
+            }
+            val mediaItem = MediaItem.Builder()
+                .setUri(url)
+                .apply { mimeType?.let { setMimeType(it) } }
+                .build()
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             if (args["autoPlay"] as? Boolean == true) {

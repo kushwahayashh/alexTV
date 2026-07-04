@@ -67,8 +67,11 @@ class _HomeState extends State<Home> {
 
   void _releaseToTop() {
     if (_pageController.hasClients) {
-      _pageController.animateTo(0,
-          duration: const Duration(milliseconds: 320), curve: Curves.easeOut);
+      _pageController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -85,17 +88,23 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: FocusScopeProvider(
-        controller: _focus,
-        child: Focus(
-          focusNode: _keyboardNode,
-          autofocus: true,
-          onKeyEvent: (_, event) => _focus.handleKey(
-            event,
-            () => debugPrint('BACK pressed'),
-            _releaseToTop,
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) debugPrint('BACK pressed');
+        },
+        child: FocusScopeProvider(
+          controller: _focus,
+          child: Focus(
+            focusNode: _keyboardNode,
+            autofocus: true,
+            onKeyEvent: (_, event) => _focus.handleKey(
+              event,
+              () => debugPrint('BACK pressed'),
+              _releaseToTop,
+            ),
+            child: _buildBody(),
           ),
-          child: _buildBody(),
         ),
       ),
     );
@@ -132,7 +141,10 @@ class _HomeState extends State<Home> {
                         const SizedBox(width: 12),
                         HeaderButton(label: 'Search', onFocused: _releaseToTop),
                         const SizedBox(width: 12),
-                        HeaderButton(label: 'Library', onFocused: _releaseToTop),
+                        HeaderButton(
+                          label: 'Library',
+                          onFocused: _releaseToTop,
+                        ),
                       ],
                     ),
                   ),

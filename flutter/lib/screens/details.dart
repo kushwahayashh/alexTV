@@ -65,49 +65,51 @@ class _DetailsState extends State<Details> {
     final media = widget.media;
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: FocusScopeProvider(
-        controller: _focus,
-        child: Focus(
-          focusNode: _keyboardNode,
-          autofocus: true,
-          onKeyEvent: (_, event) => _focus.handleKey(
-            event,
-            widget.onBack,
-            null,
-          ),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height,
-            width: double.infinity,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Backdrop — keyed so it remounts per title, replaying the fade-in.
-                if (media.backdropPath != null)
-                  FadeImage(
-                    key: ValueKey('bg-${media.id}'),
-                    src: Img.backdrop(media.backdropPath),
-                    alignment: const Alignment(0, -0.64),
-                  ),
-                // Scrim: same gradient stack as the hero.
-                const Scrim(),
-                // Content, also fade-in per title.
-                Positioned(
-                  left: AppSizes.pagePadding,
-                  bottom: 120,
-                  width: MediaQuery.of(context).size.width * 0.50,
-                  child: FadeIn(
-                    key: ValueKey('content-${media.id}'),
-                    child: _DetailsContent(
-                      media: media,
-                      playId: _playId,
-                      watchLaterId: _watchLaterId,
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) widget.onBack();
+        },
+        child: FocusScopeProvider(
+          controller: _focus,
+          child: Focus(
+            focusNode: _keyboardNode,
+            autofocus: true,
+            onKeyEvent: (_, event) =>
+                _focus.handleKey(event, widget.onBack, null),
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Backdrop — keyed so it remounts per title, replaying the fade-in.
+                  if (media.backdropPath != null)
+                    FadeImage(
+                      key: ValueKey('bg-${media.id}'),
+                      src: Img.backdrop(media.backdropPath),
+                      alignment: const Alignment(0, -0.64),
+                    ),
+                  // Scrim: same gradient stack as the hero.
+                  const Scrim(),
+                  // Content, also fade-in per title.
+                  Positioned(
+                    left: AppSizes.pagePadding,
+                    bottom: 120,
+                    width: MediaQuery.of(context).size.width * 0.50,
+                    child: FadeIn(
+                      key: ValueKey('content-${media.id}'),
+                      child: _DetailsContent(
+                        media: media,
+                        playId: _playId,
+                        watchLaterId: _watchLaterId,
+                      ),
                     ),
                   ),
-                ),
-                // Player overlay.
-                if (_showPlayer)
-                  Player(media: media, onClose: _closePlayer),
-              ],
+                  // Player overlay.
+                  if (_showPlayer) Player(media: media, onClose: _closePlayer),
+                ],
+              ),
             ),
           ),
         ),
@@ -145,7 +147,11 @@ class _DetailsContent extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: AppColors.text,
             shadows: [
-              Shadow(color: Color(0x99000000), blurRadius: 18, offset: Offset(0, 2)),
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 18,
+                offset: Offset(0, 2),
+              ),
             ],
           ),
         ),
