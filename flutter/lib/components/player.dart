@@ -93,7 +93,7 @@ class _PlayerState extends State<Player> {
 
   void _pickLink(StreamLink link) {
     setState(() {
-      _streamUrl = link.proxiedUrl.isNotEmpty ? link.proxiedUrl : link.url;
+      _streamUrl = link.url;
       _streamExt = link.ext;
       _phase = _Phase.playing;
     });
@@ -166,12 +166,11 @@ class _PlayerState extends State<Player> {
         key: const ValueKey('links'),
         items: [
           for (final l in _links)
-            if (!(l.ext == 'mp4' && l.quality.toUpperCase() == 'ORG'))
-              _PickerData(
-                label: l.quality,
-                meta: '${l.ext} · ${l.speed}',
-                onSelect: () => _pickLink(l),
-              ),
+            _PickerData(
+              label: l.quality,
+              meta: '${l.ext} · ${l.speed}',
+              onSelect: () => _pickLink(l),
+            ),
         ],
       ),
       _Phase.playing => const SizedBox.shrink(),
