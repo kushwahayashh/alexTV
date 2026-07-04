@@ -49,6 +49,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Native full-screen ExoPlayer. Runs playback outside Flutter to avoid
+             platform-view hybrid composition (the source of control-UI freezing
+             on low-power TV hardware). -->
+        <activity
+            android:name=".PlayerActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|density|uiMode|navigation"
+            android:theme="@style/PlayerTheme"
+            android:hardwareAccelerated="true"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

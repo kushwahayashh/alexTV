@@ -1,17 +1,23 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../api/stream.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
-import 'video_player_screen.dart';
 
-enum _Phase { loading, files, links, playing, error }
+enum _Phase { loading, files, links, error }
 
-/// Three-step playback modal (video player not yet implemented):
+/// Method channel to the native full-screen ExoPlayer (see MainActivity /
+/// PlayerActivity on the Android side). Playback runs in a separate native
+/// Activity rather than an embedded platform view, so Flutter is out of the
+/// render path and the player stays smooth on low-power TV hardware.
+const _playerChannel = MethodChannel('com.example.alextv/player');
+
+/// Three-step playback modal:
 ///   1. Resolve movie → list video files
 ///   2. Pick a file → fetch stream links (quality options)
-///   3. Pick a link → (TODO: play in video player)
+///   3. Pick a link → launch the native ExoPlayer activity
 ///
 /// Creates its own FocusController so D-pad keys are swallowed here and never
 /// reach the Details page's key handler while the modal is open. Back/Escape
@@ -33,8 +39,6 @@ class _PlayerState extends State<Player> {
   List<VideoFile> _files = [];
   List<StreamLink> _links = [];
   String _error = '';
-  String? _streamUrl;
-  String _streamExt = '';
 
   @override
   void initState() {
@@ -91,13 +95,23 @@ class _PlayerState extends State<Player> {
     }
   }
 
-  void _pickLink(StreamLink link) {
-    setState(() {
-      // Play the direct stream URL (no proxy).
-      _streamUrl = link.url;
-      _streamExt = link.ext;
-      _phase = _Phase.playing;
-    });
+  void _pickLink(StreamLink link) async {
+    // Launch the native full-screen ExoPlayer. Playback happens in its own
+    // Activity; the Flutter modal stays mounted underneath and is revealed
+    // again when the user backs out of the player.
+    try {
+      await _playerChannel.invokeMethod('play', {
+        'url': link.url,
+        'ext': link.ext,
+        'title': widget.media.title,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _phase = _Phase.error;
+        _error = 'Could not start playback: $e';
+      });
+    }
   }
 
   @override
@@ -109,18 +123,6 @@ class _PlayerState extends State<Player> {
 
   @override
   Widget build(BuildContext context) {
-    // When playing, render the fullscreen video player directly (it manages
-    // its own FocusController + key handling).
-    if (_phase == _Phase.playing && _streamUrl != null) {
-      return VideoPlayerScreen(
-        key: const ValueKey('player'),
-        url: _streamUrl!,
-        title: widget.media.title,
-        ext: _streamExt,
-        onClose: widget.onClose,
-      );
-    }
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -174,7 +176,6 @@ class _PlayerState extends State<Player> {
             ),
         ],
       ),
-      _Phase.playing => const SizedBox.shrink(),
       _Phase.error => _ErrorModal(error: _error, onClose: widget.onClose),
     };
   }

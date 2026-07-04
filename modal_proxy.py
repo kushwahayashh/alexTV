@@ -21,7 +21,7 @@ import urllib.parse
 
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
-from modal import App, Image, fastapi_endpoint
+from modal import App, Image, concurrent, fastapi_endpoint
 
 app = App("alexstream-proxy")
 
@@ -92,6 +92,7 @@ def rewrite_m3u8(text: str, target_url: str) -> str:
 
 
 @app.function(image=image, min_containers=1)
+@concurrent(max_inputs=100)
 @fastapi_endpoint(method="GET")
 async def proxy(request: Request):
     import httpx
