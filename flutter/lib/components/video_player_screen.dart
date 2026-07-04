@@ -33,6 +33,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   VideoPlayerController? _vpc;
   bool _initialized = false;
   bool _isPlaying = false;
+  String? _error;
 
   // Focusable IDs
   late final int _seekId;
@@ -46,8 +47,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void initState() {
     super.initState();
     _focus = FocusController();
-    _initVideo();
     _registerFocusables();
+    _initVideo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardNode.requestFocus();
     });
@@ -55,18 +56,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _initVideo() {
     final url = widget.url;
-    _vpc = url.contains('.m3u8')
-        ? VideoPlayerController.networkUrl(Uri.parse(url),
-            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true))
-        : VideoPlayerController.networkUrl(Uri.parse(url));
+    debugPrint('[VideoPlayer] initializing with URL: $url');
+    _vpc = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
+
     _vpc!.initialize().then((_) {
       if (!mounted) return;
+      debugPrint('[VideoPlayer] initialized, size=${_vpc!.value.size}');
       _vpc!.addListener(_onVideoUpdate);
       _vpc!.play();
       setState(() => _initialized = true);
     }).catchError((e) {
       if (!mounted) return;
-      debugPrint('Video init error: $e');
+      debugPrint('[VideoPlayer] init error: $e');
+      setState(() => _error = 'Failed to load video: $e');
     });
   }
 
@@ -158,29 +163,56 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         child: Scaffold(
           backgroundColor: Colors.black,
           body: SizedBox.expand(
-            child: _initialized && _vpc != null && _vpc!.value.isInitialized
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Video
-                      FittedBox(
-                        fit: BoxFit.contain,
-                        child: SizedBox(
-                          width: _vpc!.value.size.width,
-                          height: _vpc!.value.size.height,
-                          child: VideoPlayer(_vpc!),
-                        ),
+            child: _error != null
+                ? _buildError()
+                : _initialized && _vpc != null && _vpc!.value.isInitialized
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Video
+                          FittedBox(
+                            fit: BoxFit.contain,
+                            child: SizedBox(
+                              width: _vpc!.value.size.width,
+                              height: _vpc!.value.size.height,
+                              child: VideoPlayer(_vpc!),
+                            ),
+                          ),
+                          // Controls overlay
+                          Builder(builder: _buildControls),
+                        ],
+                      )
+                    // Loading
+                    : const Center(
+                        child: CircularProgressIndicator(color: AppColors.text),
                       ),
-                      // Controls overlay
-                      _buildControls(context),
-                    ],
-                  )
-                // Loading
-                : const Center(
-                    child: CircularProgressIndicator(color: AppColors.text),
-                  ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 48, color: AppColors.muted),
+          const SizedBox(height: 16),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.text.withValues(alpha: 0.7),
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Press Back to return',
+            style: TextStyle(color: AppColors.muted, fontSize: 14),
+          ),
+        ],
       ),
     );
   }
@@ -333,12 +365,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             clipBehavior: Clip.none,
             children: [
               // Fill
-              FractionallySizedBox(
-                widthFactor: pct / 100,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(999),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: pct / 100,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
               ),
@@ -346,21 +381,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               if (focused)
                 Positioned(
                   left: 0,
+                  right: 0,
                   top: 0,
                   bottom: 0,
-                  child: FractionallySizedBox(
-                    widthFactor: pct / 100,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          color: AppColors.focus,
-                          shape: BoxShape.circle,
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x80000000),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: pct / 100,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: AppColors.focus,
+                            shape: BoxShape.circle,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x80000000),
                               blurRadius: 8,
                               offset: Offset(0, 2),
                             ),
@@ -370,6 +408,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
