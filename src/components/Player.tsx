@@ -63,7 +63,7 @@ export function Player({ media, onClose }: { media: Media; onClose: () => void }
 
   // Play a given stream link.
   function playLink(link: StreamLink) {
-    setStreamUrl(link.proxiedUrl)
+    setStreamUrl(link.url)
     setPhase('playing')
   }
 
