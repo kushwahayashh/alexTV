@@ -92,7 +92,7 @@ class _PlayerState extends State<Player> {
 
   void _pickLink(StreamLink link) {
     setState(() {
-      _streamUrl = link.url;
+      _streamUrl = link.proxiedUrl.isNotEmpty ? link.proxiedUrl : link.url;
       _phase = _Phase.playing;
     });
   }
