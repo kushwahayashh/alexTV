@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
+import 'fade_image.dart';
 
 /// A focusable poster. On focus it scales up with a white outline and scrolls
 /// itself into view: centered horizontally in its rail and lifted vertically to
@@ -135,26 +136,16 @@ class _PosterCardState extends State<PosterCard> {
             ),
             clipBehavior: Clip.antiAlias,
             child: media.posterPath != null
-                ? Image.network(
-                    Img.poster(media.posterPath),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => _placeholder(media.title),
+                ? FadeImage(
+                    src: Img.poster(media.posterPath),
+                    errorWidget: _placeholder(),
                   )
-                : _placeholder(media.title),
+                : _placeholder(),
           ),
         ),
       ),
     );
   }
 
-  Widget _placeholder(String title) => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Center(
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted, fontSize: 14),
-          ),
-        ),
-      );
+  Widget _placeholder() => const SizedBox.shrink();
 }

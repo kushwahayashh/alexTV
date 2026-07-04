@@ -1,4 +1,5 @@
 import { IMG, type Media } from '../api/tmdb'
+import { FadeImage } from './FadeImage'
 
 /** Cinematic hero that auto-rotates through featured titles on its own. */
 export function Hero({ media }: { media: Media | null }) {
@@ -8,7 +9,7 @@ export function Hero({ media }: { media: Media | null }) {
     <div className="hero">
       {media.backdropPath && (
         // key forces a remount per title so the fade-in animation replays.
-        <img
+        <FadeImage
           key={media.id}
           className="hero__bg"
           src={IMG.backdrop(media.backdropPath)}

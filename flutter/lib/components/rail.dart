@@ -38,7 +38,7 @@ class _RailState extends State<Rail> {
         Padding(
           padding: const EdgeInsets.only(
             left: AppSizes.pagePadding,
-            bottom: 14,
+            bottom: 28,
           ),
           child: Text(
             widget.rail.title,

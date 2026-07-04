@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart';
 import '../components/hero.dart' show FadeIn, Scrim;
+import '../components/fade_image.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
@@ -82,15 +83,10 @@ class _DetailsState extends State<Details> {
               children: [
                 // Backdrop — keyed so it remounts per title, replaying the fade-in.
                 if (media.backdropPath != null)
-                  FadeIn(
+                  FadeImage(
                     key: ValueKey('bg-${media.id}'),
-                    child: SizedBox.expand(
-                      child: Image.network(
-                        Img.backdrop(media.backdropPath),
-                        fit: BoxFit.cover,
-                        alignment: const Alignment(0, -0.64),
-                      ),
-                    ),
+                    src: Img.backdrop(media.backdropPath),
+                    alignment: const Alignment(0, -0.64),
                   ),
                 // Scrim: same gradient stack as the hero.
                 const Scrim(),

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useFocusable } from '../focus/FocusEngine'
 import { IMG, type Media } from '../api/tmdb'
+import { FadeImage } from '../components/FadeImage'
 import { Player } from '../components/Player'
 
 /**
@@ -28,7 +29,7 @@ export function Details({ media }: { media: Media }) {
     <div className="details">
       <div className="details__hero">
         {media.backdropPath && (
-          <img
+          <FadeImage
             key={media.id}
             className="details__bg"
             src={IMG.backdrop(media.backdropPath)}

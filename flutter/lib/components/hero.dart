@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart';
 import '../theme.dart';
+import 'fade_image.dart';
 
 /// Cinematic hero that auto-rotates through featured titles on its own.
 /// Backdrop + content cross-fade on each change (no zoom/slide) — ported from
@@ -35,18 +36,14 @@ class Hero extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           // Backdrop — keyed so it remounts per title, replaying the fade-in.
-          FadeIn(
-            key: ValueKey('bg-${m.id}'),
-            child: m.backdropPath != null
-                ? SizedBox.expand(
-                    child: Image.network(
-                      Img.backdrop(m.backdropPath),
-                      fit: BoxFit.cover,
-                      alignment: const Alignment(0, -0.64),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
+          if (m.backdropPath != null)
+            FadeImage(
+              key: ValueKey('bg-${m.id}'),
+              src: Img.backdrop(m.backdropPath),
+              alignment: const Alignment(0, -0.64),
+            )
+          else
+            const SizedBox.shrink(),
           // Scrim: left-to-right + bottom-up fade to the page background.
           const Scrim(),
           // Content, also fade-in per title.

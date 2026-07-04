@@ -1,4 +1,5 @@
 import { useFocusable } from '../focus/FocusEngine'
+import { FadeImage } from './FadeImage'
 import { IMG, type Media } from '../api/tmdb'
 
 export function PosterCard({
@@ -18,9 +19,9 @@ export function PosterCard({
       className={`poster${focused ? ' poster--focused' : ''}`}
     >
       {media.posterPath ? (
-        <img className="poster__img" src={IMG.poster(media.posterPath)} alt={media.title} loading="lazy" />
+        <FadeImage className="poster__img" src={IMG.poster(media.posterPath)} alt="" loading="lazy" />
       ) : (
-        <div className="poster__placeholder">{media.title}</div>
+        <div className="poster__placeholder" />
       )}
     </div>
   )
