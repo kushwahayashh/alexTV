@@ -21,3 +21,7 @@ yarn-error.log*
 
 # Note: the Flutter app has its own .gitignore under flutter/ that covers
 # build artifacts, .dart_tool, and android/local.properties.
+
+# Python
+__pycache__/
+*.pyc

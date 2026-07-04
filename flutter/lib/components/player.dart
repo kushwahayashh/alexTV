@@ -93,7 +93,10 @@ class _PlayerState extends State<Player> {
 
   void _pickLink(StreamLink link) {
     setState(() {
-      _streamUrl = link.url;
+      // Play through the Modal proxy (shegu blocks Cloudflare egress, so the
+      // raw URL 502s on the old worker). Fall back to the direct URL only if
+      // the backend didn't supply a proxied variant.
+      _streamUrl = link.proxiedUrl.isNotEmpty ? link.proxiedUrl : link.url;
       _streamExt = link.ext;
       _phase = _Phase.playing;
     });
