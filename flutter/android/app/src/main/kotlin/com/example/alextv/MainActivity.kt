@@ -12,7 +12,6 @@ class MainActivity : FlutterActivity() {
             .registerViewFactory(
                 SurfaceVideoPlayerFactory.VIEW_TYPE,
                 SurfaceVideoPlayerFactory(
-                    this,
                     flutterEngine.dartExecutor.binaryMessenger,
                 ),
             )

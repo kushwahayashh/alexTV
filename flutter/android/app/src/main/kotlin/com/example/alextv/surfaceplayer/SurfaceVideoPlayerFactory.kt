@@ -8,7 +8,6 @@ import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
 
 class SurfaceVideoPlayerFactory(
-    private val context: Context,
     private val messenger: BinaryMessenger,
 ) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
 
@@ -16,7 +15,7 @@ class SurfaceVideoPlayerFactory(
         const val VIEW_TYPE = "com.example.alextv/surface_video_player"
     }
 
-    override fun create(viewId: Int, args: Any?): PlatformView {
+    override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
         @Suppress("UNCHECKED_CAST")
         val params = (args as? Map<String, Any>) ?: emptyMap()
         val channelName = "$VIEW_TYPE/$viewId"
