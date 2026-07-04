@@ -73,7 +73,7 @@ class SurfaceVideoPlayer(
                     result.success(null)
                 }
                 "seekTo" -> {
-                    val pos = (call.argument<Long>("position") ?: 0L)
+                    val pos = (call.argument<Number>("position") ?: 0).toLong()
                     exoPlayer.seekTo(pos)
                     result.success(null)
                 }

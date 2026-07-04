@@ -205,6 +205,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             ? _duration
             : pos;
     await c.seekTo(clamped);
+    // Update locally so the UI reflects the seek immediately.
+    setState(() => _position = clamped);
   }
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
