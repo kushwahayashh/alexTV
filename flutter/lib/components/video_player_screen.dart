@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
 import '../focus/focus_engine.dart';
+import '../surface_video_player.dart';
 import '../theme.dart';
 
 /// Fullscreen video player with custom TV controls overlay:
@@ -9,8 +10,9 @@ import '../theme.dart';
 ///   - Bottom bar: focusable seekbar (left/right seeks when focused),
 ///     Play/Pause pill (left), Subtitles + Audio pills (right, mock)
 ///
-/// Uses ExoPlayer on Android via the video_player package.
-/// Creates its own FocusController so D-pad keys are handled here.
+/// Uses a native ExoPlayer with SurfaceView (not TextureView) so hardware
+/// decoders on Android TV work correctly. Creates its own FocusController
+/// so D-pad keys are handled here.
 class VideoPlayerScreen extends StatefulWidget {
   final String url;
   final String title;
@@ -30,10 +32,14 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final FocusController _focus;
   final _keyboardNode = FocusNode();
-  VideoPlayerController? _vpc;
+  SurfaceVideoPlayerController? _nativeController;
   bool _initialized = false;
   bool _isPlaying = false;
   String? _error;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  StreamSubscription? _stateSub;
+  Timer? _positionTimer;
 
   // Focusable IDs
   late final int _seekId;
@@ -48,30 +54,45 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.initState();
     _focus = FocusController();
     _registerFocusables();
-    _initVideo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardNode.requestFocus();
     });
   }
 
-  void _initVideo() {
-    final url = widget.url;
-    debugPrint('[VideoPlayer] initializing with URL: $url');
-    _vpc = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
+  void _onControllerCreated(SurfaceVideoPlayerController controller) {
+    _nativeController = controller;
 
-    _vpc!.initialize().then((_) {
+    controller.ready.then((_) {
       if (!mounted) return;
-      debugPrint('[VideoPlayer] initialized, size=${_vpc!.value.size}');
-      _vpc!.addListener(_onVideoUpdate);
-      _vpc!.play();
+      debugPrint('[SurfaceVideoPlayer] ready');
+      _duration = controller.duration;
+      _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+        if (!mounted) {
+          _positionTimer?.cancel();
+          return;
+        }
+        _position = await controller.getPosition();
+        setState(() {});
+      });
       setState(() => _initialized = true);
     }).catchError((e) {
       if (!mounted) return;
-      debugPrint('[VideoPlayer] init error: $e');
+      debugPrint('[SurfaceVideoPlayer] error: $e');
       setState(() => _error = 'Failed to load video: $e');
+    });
+
+    _stateSub = controller.stateStream.listen((state) {
+      if (!mounted) return;
+      switch (state) {
+        case PlayerState.playing:
+          setState(() => _isPlaying = true);
+        case PlayerState.paused:
+          setState(() => _isPlaying = false);
+        case PlayerState.error:
+          setState(() => _error = controller.error ?? 'Playback error');
+        default:
+          break;
+      }
     });
   }
 
@@ -82,41 +103,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _audioId = _focus.register(onSelect: () {});
   }
 
-  void _onVideoUpdate() {
-    if (!mounted) return;
-    final playing = _vpc?.value.isPlaying ?? false;
-    if (playing != _isPlaying) {
-      setState(() => _isPlaying = playing);
-    }
-  }
-
-  void _togglePlay() {
-    final v = _vpc;
-    if (v == null || !v.value.isInitialized) return;
-    if (v.value.isPlaying) {
-      v.pause();
+  void _togglePlay() async {
+    final c = _nativeController;
+    if (c == null || !_initialized) return;
+    if (_isPlaying) {
+      await c.pause();
     } else {
-      v.play();
+      await c.play();
     }
   }
 
-  void _seekBy(Duration delta) {
-    final v = _vpc;
-    if (v == null || !v.value.isInitialized) return;
-    final pos = v.value.position + delta;
-    final dur = v.value.duration;
+  void _seekBy(Duration delta) async {
+    final c = _nativeController;
+    if (c == null || !_initialized) return;
+    final pos = (await c.getPosition()) + delta;
     final clamped = pos < Duration.zero
         ? Duration.zero
-        : pos > dur
-            ? dur
+        : pos > _duration
+            ? _duration
             : pos;
-    v.seekTo(clamped);
+    await c.seekTo(clamped);
   }
 
-  /// Intercept arrow keys when the seekbar is focused so left/right seeks
-  /// instead of moving focus to another control.
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
-    // If seekbar is focused, intercept left/right to seek.
     final focused = _focus.focusId;
     if (focused == _seekId && (event is KeyDownEvent || event is KeyRepeatEvent)) {
       if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
@@ -141,8 +150,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
-    _vpc?.removeListener(_onVideoUpdate);
-    _vpc?.dispose();
+    _positionTimer?.cancel();
+    _stateSub?.cancel();
+    _nativeController?.dispose();
     _focus.unregister(_seekId);
     _focus.unregister(_playId);
     _focus.unregister(_subId);
@@ -165,27 +175,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           body: SizedBox.expand(
             child: _error != null
                 ? _buildError()
-                : _initialized && _vpc != null && _vpc!.value.isInitialized
-                    ? Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Video
-                          FittedBox(
-                            fit: BoxFit.contain,
-                            child: SizedBox(
-                              width: _vpc!.value.size.width,
-                              height: _vpc!.value.size.height,
-                              child: VideoPlayer(_vpc!),
-                            ),
-                          ),
-                          // Controls overlay
-                          Builder(builder: _buildControls),
-                        ],
-                      )
-                    // Loading
-                    : const Center(
-                        child: CircularProgressIndicator(color: AppColors.text),
+                : Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Native SurfaceView video player
+                      SurfaceVideoPlayerController.view(
+                        url: widget.url,
+                        autoPlay: true,
+                        onCreated: _onControllerCreated,
                       ),
+                      // Controls overlay (only after initialized)
+                      if (_initialized)
+                        Builder(builder: _buildControls),
+                      // Loading spinner
+                      if (!_initialized)
+                        const Center(
+                          child: CircularProgressIndicator(color: AppColors.text),
+                        ),
+                    ],
+                  ),
           ),
         ),
       ),
@@ -219,32 +227,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Widget _buildControls(BuildContext context) {
     final controller = FocusScopeProvider.of(context);
-    final pos = _vpc?.value.position ?? Duration.zero;
-    final dur = _vpc?.value.duration ?? Duration.zero;
-    final progress = dur.inMilliseconds > 0
-        ? (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
+    final progress = _duration.inMilliseconds > 0
+        ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
-
     final seekFocused = controller.isFocused(_seekId);
 
     return IgnorePointer(
-      ignoring: false, // allow focus engine to work
+      ignoring: false,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Top bar: title
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: _buildTopBar(),
           ),
-          // Bottom bar: seek + controls
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            child: _buildBottomBar(progress, pos, dur, seekFocused, controller),
+            child: _buildBottomBar(progress, _position, _duration, seekFocused, controller),
           ),
         ],
       ),
@@ -299,7 +302,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Seek bar row
           Row(
             children: [
               SizedBox(
@@ -332,7 +334,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          // Controls row
           Row(
             children: [
               _buildPillButton('Play', _playId, controller),
@@ -364,7 +365,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Fill
               Align(
                 alignment: Alignment.centerLeft,
                 child: FractionallySizedBox(
@@ -377,7 +377,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
               ),
-              // Knob (only when focused)
               if (focused)
                 Positioned(
                   left: 0,
@@ -399,16 +398,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             boxShadow: const [
                               BoxShadow(
                                 color: Color(0x80000000),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
