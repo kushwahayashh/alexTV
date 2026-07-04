@@ -9,6 +9,9 @@ export function FadeImage({
   ...props
 }: ImgHTMLAttributes<HTMLImageElement>) {
   const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  if (failed) return null
 
   return (
     <img
@@ -16,6 +19,7 @@ export function FadeImage({
       className={`${className ?? ''}${loaded ? ' fade-img--loaded' : ''}`}
       style={{ opacity: loaded ? undefined : 0 }}
       onLoad={() => setLoaded(true)}
+      onError={() => setFailed(true)}
     />
   )
 }

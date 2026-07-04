@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Image that stays invisible until fully loaded, then fades in smoothly.
 /// Mirrors the React FadeImage component — avoids the "half-loaded" flash.
-class FadeImage extends StatefulWidget {
+class FadeImage extends StatelessWidget {
   final String src;
   final BoxFit fit;
   final Alignment alignment;
@@ -17,48 +17,23 @@ class FadeImage extends StatefulWidget {
   });
 
   @override
-  State<FadeImage> createState() => _FadeImageState();
-}
-
-class _FadeImageState extends State<FadeImage>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  bool _loaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Image.network(
-      widget.src,
-      fit: widget.fit,
-      alignment: widget.alignment,
+      src,
+      fit: fit,
+      alignment: alignment,
       errorBuilder: (_, _, _) =>
-          widget.errorWidget ?? const SizedBox.shrink(),
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) {
-          // Image is fully loaded.
-          if (!_loaded) {
-            _loaded = true;
-            _controller.forward();
-          }
-          return FadeTransition(opacity: _controller, child: child);
-        }
-        // Still loading — show nothing.
-        return const SizedBox.shrink();
+          errorWidget ?? const SizedBox.shrink(),
+      // frameBuilder is Flutter's official API for image fade-in. `frame`
+      // is null while loading, non-null when decoded and ready to paint.
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded) return child;
+        return AnimatedOpacity(
+          opacity: frame != null ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+          child: child,
+        );
       },
     );
   }
