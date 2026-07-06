@@ -254,7 +254,7 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
             .onFocusChanged { }
             .focusable()
             .onKeyEvent { e ->
-                if (e.type == KeyType.KeyDown && !controlsVisible) {
+                if (e.type == KeyEventType.KeyDown && !controlsVisible) {
                     controlsVisible = true
                     true
                 } else {
@@ -515,7 +515,7 @@ private fun CircleButton(
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .onKeyEvent { e ->
-                if (e.type == KeyType.KeyDown && (e.key == Key.Enter || e.key == Key.DirectionCenter)) {
+                if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.DirectionCenter)) {
                     onClick()
                     true
                 } else false
@@ -557,7 +557,7 @@ private fun PillButton(
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .onKeyEvent { e ->
-                if (e.type == KeyType.KeyDown && (e.key == Key.Enter || e.key == Key.DirectionCenter)) {
+                if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.DirectionCenter)) {
                     onClick()
                     true
                 } else false
