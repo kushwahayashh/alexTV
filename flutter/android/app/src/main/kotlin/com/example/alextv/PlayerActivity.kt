@@ -812,7 +812,9 @@ private fun MenuOverlay(
             state = listState,
             modifier = Modifier
                 .width(620.dp)
-                .heightIn(max = maxHeight * 0.8f)
+                // Cap the height smaller so the modal doesn't tower on TV; it
+                // still wraps content when there are only a few tracks.
+                .heightIn(max = maxHeight * 0.6f)
                 .clip(RoundedCornerShape(16.dp))
                 // Solid dark background (the React modal is translucent glass,
                 // but on TV we want a solid panel so text stays readable).
