@@ -25,11 +25,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -778,7 +779,7 @@ private fun MenuOverlay(
 
     LaunchedEffect(Unit) { focus.requestFocus() }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0x99000000)) // scrim (~0.6 black), matches the web overlay
@@ -811,15 +812,23 @@ private fun MenuOverlay(
             state = listState,
             modifier = Modifier
                 .width(620.dp)
-                .heightIn(max = 560.dp)
+                .heightIn(max = maxHeight * 0.8f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.22f)),
+                // Solid dark background (the React modal is translucent glass,
+                // but on TV we want a solid panel so text stays readable).
+                .background(Color(0xFF1A1A20)),
             contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
+            // 10dp base gap mirrors .player-list gap. Section headers carry
+            // extra top/bottom padding to reproduce React's three-level spacing:
+            // 18dp between sections, 12dp header-to-first-item, 10dp item-to-item.
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(rows) { row ->
+            itemsIndexed(rows) { index, row ->
                 when (row) {
-                    is MenuRow.Header -> MenuSectionHeader(row.text)
+                    is MenuRow.Header -> MenuSectionHeader(
+                        text = row.text,
+                        isFirst = index == 0,
+                    )
                     is MenuRow.Item -> MenuItemRow(
                         track = row.track,
                         focused = row.trackIndex == highlight,
@@ -832,7 +841,12 @@ private fun MenuOverlay(
 }
 
 @Composable
-private fun MenuSectionHeader(text: String) {
+private fun MenuSectionHeader(text: String, isFirst: Boolean) {
+    // React spacing: sections are 18px apart (modal gap), a heading sits 12px
+    // above its list (.player-menu-section gap), and items are 10px apart
+    // (.player-list gap). The LazyColumn already applies a 10dp base gap, so:
+    //  - top:    +8dp before non-first headers -> 10+8 = 18dp section gap
+    //  - bottom: +2dp under every header       -> 10+2 = 12dp header-to-list
     Text(
         text = text.uppercase(),
         color = MutedColor,
@@ -840,6 +854,10 @@ private fun MenuSectionHeader(text: String) {
         fontSize = 13.sp,
         fontWeight = FontWeight.W700,
         letterSpacing = 1.sp,
+        modifier = Modifier.padding(
+            top = if (isFirst) 0.dp else 8.dp,
+            bottom = 2.dp,
+        ),
     )
 }
 
