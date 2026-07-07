@@ -24,10 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -50,8 +48,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -324,9 +324,6 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
             )
 
             else -> {
-                // Centered play icon when paused.
-                if (!isPlaying) PausedIndicator(Modifier.align(Alignment.Center))
-
                 ControlsOverlay(
                     title = title,
                     visible = controlsVisible,
@@ -387,6 +384,13 @@ private fun ControlsOverlay(
                 fontWeight = FontWeight.W700,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color(0x99000000),
+                        offset = Offset(0f, 2f),
+                        blurRadius = 8f,
+                    ),
+                ),
                 modifier = Modifier.align(Alignment.CenterStart),
             )
         }
@@ -600,29 +604,11 @@ private fun TimeText(text: String) {
         fontFamily = VarelaRound,
         fontSize = 16.sp,
         fontWeight = FontWeight.W700,
+        style = TextStyle(
+            fontFeatureSettings = "tnum",
+            shadow = Shadow(color = Color(0x66000000), blurRadius = 4f),
+        ),
     )
-}
-
-// ----------------------------------------------------------------
-// Center paused indicator.
-// ----------------------------------------------------------------
-
-@Composable
-private fun PausedIndicator(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(96.dp)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.55f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.PlayArrow,
-            contentDescription = "Paused",
-            tint = TextColor,
-            modifier = Modifier.size(48.dp),
-        )
-    }
 }
 
 // ----------------------------------------------------------------

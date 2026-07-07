@@ -188,13 +188,6 @@ export function VideoPlayer({
         <div className="player-top__title">{title}</div>
       </div>
 
-      {/* Center play indicator (when paused) */}
-      {!isPlaying && (
-        <div className="player-center-icon" aria-hidden>
-          ▶
-        </div>
-      )}
-
       {/* Bottom bar */}
       <div className={`player-bottom${controlsVisible ? '' : ' player-bottom--hidden'}`}>
         <div className="player-seek">
