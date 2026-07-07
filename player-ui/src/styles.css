@@ -71,6 +71,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+.player-top__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 /* ---------- Bottom bar ---------- */
@@ -147,14 +154,6 @@ body {
   opacity: 1;
 }
 
-/* ---------- Controls row ---------- */
-.player-controls-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  justify-content: center;
-}
-
 /* ---------- Circular icon button (close, etc.) ---------- */
 .player-circle-btn {
   display: grid;
@@ -202,56 +201,89 @@ body {
 }
 
 /* ---------- Pop-up menus (Subtitles / Audio) ---------- */
-.player-menu {
-  position: absolute;
-  bottom: 140px;
-  right: 40px;
-  min-width: 260px;
-  background: rgba(20, 20, 24, 0.92);
-  backdrop-filter: blur(16px);
-  border-radius: 14px;
-  padding: 16px 12px;
-  z-index: 5;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-  animation: menuIn 0.18s ease-out both;
+/* Modal shell copied 1:1 from the main app's quality picker
+   (src/styles.css .player-overlay / .player-modal / .player-list / .player-item)
+   so the Audio menu matches it exactly. */
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-@keyframes menuIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.player-modal {
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 36px 44px;
+  width: 620px;
+  max-height: 80vh;
+  overflow-y: auto;
+  /* Room from the edges when a focused row is scrolled into view (matches the
+     homepage's scroll-padding-top used with scrollIntoView). */
+  scroll-padding: 24px 0;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-.player-menu__title {
+.player-modal::-webkit-scrollbar {
+  display: none;
+}
+.player-modal__title {
   font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  padding: 4px 14px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 6px;
 }
-.player-menu__item {
-  padding: 12px 14px;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
+/* A titled group of tracks inside the modal (e.g. "ORG subs", "WebSubs").
+   The modal's 18px gap separates sections; this keeps a heading tight to
+   its own list. */
+.player-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
   color: var(--text);
-  cursor: pointer;
-  transition: background 0.14s ease;
-}
-.player-menu__item:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-.player-menu__item--active {
-  color: var(--accent);
+  font-size: 1rem;
   font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  outline: 3px solid transparent;
 }
-.player-menu__item--active::before {
-  content: '✓ ';
-  color: var(--accent);
+.player-item:hover,
+.player-item--focused {
+  background: var(--focus);
+  color: var(--bg);
+  transform: scale(1.02);
+}
+.player-item__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 16px;
+}
+.player-item__meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.7;
+  white-space: nowrap;
 }

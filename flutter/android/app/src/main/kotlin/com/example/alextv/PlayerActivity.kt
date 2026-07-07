@@ -24,6 +24,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -93,26 +100,72 @@ private val VarelaRound = FontFamily(Font(R.font.varela_round))
 private const val SEEK_STEP_MS = 10_000L
 private const val HIDE_DELAY_MS = 4_000L
 
+// ----------------------------------------------------------------
+// Mock Audio / Subtitles menu data — ported 1:1 from the React
+// player-ui (player-ui/src/VideoPlayer.tsx). Both menus render with the same
+// modal UI as the main app's quality picker.
+// ----------------------------------------------------------------
+
+private data class Track(val id: String, val label: String, val meta: String)
+private data class MenuSection(val heading: String, val tracks: List<Track>)
+private enum class MenuKind { AUDIO, SUBTITLES }
+
+private val AUDIO_TRACKS = listOf(
+    Track("en-51", "English", "5.1 · AC3"),
+    Track("en-stereo", "English", "Stereo · AAC"),
+    Track("es-stereo", "Spanish", "Stereo · AAC"),
+)
+
+private val SUBTITLE_ORG = listOf(
+    Track("org-en", "English", "Embedded"),
+    Track("org-en-sdh", "English (SDH)", "Embedded"),
+    Track("org-es", "Spanish", "Embedded"),
+)
+
+private val SUBTITLE_WEB = listOf(
+    Track("web-en", "English", "SRT"),
+    Track("web-es", "Spanish", "SRT"),
+    Track("web-fr", "French", "SRT"),
+    Track("web-de", "German", "SRT"),
+    Track("web-it", "Italian", "SRT"),
+    Track("web-pt", "Portuguese", "SRT"),
+    Track("web-ja", "Japanese", "SRT"),
+    Track("web-ko", "Korean", "SRT"),
+    Track("web-ar", "Arabic", "SRT"),
+)
+
+// Per-menu config: an ordered list of sections (each with its own heading).
+// D-pad navigation flows through every section as one continuous index; the
+// headings only divide the list visually.
+private fun menuSections(kind: MenuKind): List<MenuSection> = when (kind) {
+    MenuKind.AUDIO -> listOf(MenuSection("Audio Tracks", AUDIO_TRACKS))
+    MenuKind.SUBTITLES -> listOf(
+        MenuSection("ORG subs", SUBTITLE_ORG),
+        MenuSection("WebSubs", SUBTITLE_WEB),
+    )
+}
+
+private fun menuTracks(kind: MenuKind): List<Track> =
+    menuSections(kind).flatMap { it.tracks }
+
 /**
  * Full-screen player activity.
  *
- * The Compose overlay is a faithful port of the old Flutter/Dart player
- * (`components/video_player_screen.dart`, removed in commit cdfe08f):
+ * The Compose overlay mirrors the React player-ui (player-ui/) 1:1:
  *
- *   Top bar:    [title]
+ *   Top bar:    [title]              [Subtitles] [Audio]
  *   Bottom bar: [seekbar]
  *               [current time            total time]
- *               [Subtitles] [Audio]   (centered)
  *
  * Focus model (D-pad):
- *   Row 0: [seek]      Row 1: [subtitles] [audio]
- *   - Up/Down moves between rows.
+ *   Row 0: [subtitles] [audio]   Row 1: [seek]
+ *   - Up/Down moves between rows (pills are above the seekbar).
  *   - Left/Right on the seekbar seeks +-10s (intercepted, no focus move).
  *   - Left/Right on the pill row moves between the two pills.
- *   - Enter on the seekbar toggles play/pause (there is NO separate button;
- *     a centered play icon shows when paused).
- *   - Enter on a pill opens a mock menu (no-op).
- *   - Back closes the player.
+ *   - Enter on the seekbar toggles play/pause.
+ *   - Enter on a pill opens its menu (Subtitles / Audio) — a modal picker with
+ *     the same UI as the main app's quality picker, using mock tracks.
+ *   - Back closes the open menu first, otherwise closes the player.
  *   Controls auto-hide after 4s; any key resurfaces them.
  *
  * ExoPlayer setup (browser UA, decoder fallback, MIME sniffing) is unchanged;
@@ -223,6 +276,14 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
 
+    // Audio / Subtitles menu state. `menuKind` is null when no menu is open;
+    // the selected track index is remembered per menu. `menuReturnFocus` is the
+    // pill to restore focus to when the menu closes.
+    var menuKind by remember { mutableStateOf<MenuKind?>(null) }
+    var selectedAudio by remember { mutableIntStateOf(0) }
+    var selectedSubtitle by remember { mutableIntStateOf(0) }
+    var menuReturnFocus by remember { mutableStateOf<FocusRequester?>(null) }
+
     // Bumped on every key press; restarts the auto-hide timer (mirrors the old
     // Dart `_bumpActivity()`).
     var activityTick by remember { mutableIntStateOf(0) }
@@ -276,7 +337,17 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
         }
     }
 
-    BackHandler { onClose() }
+    // When a menu closes, restore focus to the pill that opened it.
+    LaunchedEffect(menuKind) {
+        if (menuKind == null) {
+            menuReturnFocus?.let {
+                it.requestFocus()
+                menuReturnFocus = null
+            }
+        }
+    }
+
+    BackHandler { if (menuKind != null) menuKind = null else onClose() }
 
     fun bump() { activityTick++ }
 
@@ -335,8 +406,24 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
                     audioFocus = audioFocus,
                     onTogglePlay = { togglePlay() },
                     onSeek = { seekBy(it) },
+                    onOpenMenu = { kind ->
+                        menuReturnFocus = if (kind == MenuKind.AUDIO) audioFocus else subFocus
+                        menuKind = kind
+                    },
                 )
             }
+        }
+
+        // Audio / Subtitles menu — drawn above the controls with a scrim.
+        menuKind?.let { kind ->
+            MenuOverlay(
+                kind = kind,
+                selectedIndex = if (kind == MenuKind.AUDIO) selectedAudio else selectedSubtitle,
+                onSelect = { idx ->
+                    if (kind == MenuKind.AUDIO) selectedAudio = idx else selectedSubtitle = idx
+                },
+                onDismiss = { menuKind = null },
+            )
         }
     }
 }
@@ -353,6 +440,7 @@ private fun ControlsOverlay(
     audioFocus: FocusRequester,
     onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
+    onOpenMenu: (MenuKind) -> Unit,
 ) {
     // Both bars fade together over 300ms (old Dart AnimatedOpacity). Kept
     // composed while hidden so focus requesters stay valid.
@@ -363,8 +451,8 @@ private fun ControlsOverlay(
     )
 
     Box(Modifier.fillMaxSize()) {
-        // ---- Top bar: title, gradient top->bottom ----
-        Box(
+        // ---- Top bar: title (left) + Subtitles/Audio pills (right) ----
+        Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
@@ -374,7 +462,8 @@ private fun ControlsOverlay(
                         listOf(Color(0xB3000000), Color.Transparent)
                     )
                 )
-                .padding(horizontal = 40.dp, vertical = 24.dp)
+                .padding(horizontal = 40.dp, vertical = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
@@ -391,11 +480,31 @@ private fun ControlsOverlay(
                         blurRadius = 8f,
                     ),
                 ),
-                modifier = Modifier.align(Alignment.CenterStart),
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(14.dp))
+            PillButton(
+                label = "Subtitles",
+                focusRequester = subFocus,
+                onClick = { onOpenMenu(MenuKind.SUBTITLES) },
+                modifier = Modifier.focusProperties {
+                    down = seekFocus
+                    right = audioFocus
+                },
+            )
+            Spacer(Modifier.width(14.dp))
+            PillButton(
+                label = "Audio",
+                focusRequester = audioFocus,
+                onClick = { onOpenMenu(MenuKind.AUDIO) },
+                modifier = Modifier.focusProperties {
+                    down = seekFocus
+                    left = subFocus
+                },
             )
         }
 
-        // ---- Bottom bar: seek + timestamps + pills, gradient bottom->top ----
+        // ---- Bottom bar: seek + timestamps, gradient bottom->top ----
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -414,7 +523,7 @@ private fun ControlsOverlay(
                 focusRequester = seekFocus,
                 onTogglePlay = onTogglePlay,
                 onSeek = onSeek,
-                modifier = Modifier.focusProperties { down = subFocus },
+                modifier = Modifier.focusProperties { up = subFocus },
             )
 
             Spacer(Modifier.height(8.dp))
@@ -425,33 +534,6 @@ private fun ControlsOverlay(
             ) {
                 TimeText(fmtTime(position))
                 TimeText(fmtTime(duration))
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                PillButton(
-                    label = "Subtitles",
-                    focusRequester = subFocus,
-                    onClick = { },
-                    modifier = Modifier.focusProperties {
-                        up = seekFocus
-                        right = audioFocus
-                    },
-                )
-                Spacer(Modifier.width(14.dp))
-                PillButton(
-                    label = "Audio",
-                    focusRequester = audioFocus,
-                    onClick = { },
-                    modifier = Modifier.focusProperties {
-                        up = seekFocus
-                        left = subFocus
-                    },
-                )
             }
         }
     }
@@ -609,6 +691,194 @@ private fun TimeText(text: String) {
             shadow = Shadow(color = Color(0x66000000), blurRadius = 4f),
         ),
     )
+}
+
+// ----------------------------------------------------------------
+// Audio / Subtitles menu — same modal UI as the main app's quality picker,
+// ported 1:1 from the React player-ui. A focusable scrim traps all D-pad
+// input; navigation runs through one continuous index across sections.
+// ----------------------------------------------------------------
+
+// A rendered row: a section heading or a track item. `trackIndex` is the
+// continuous 0-based index across all sections (used for focus + selection).
+private sealed interface MenuRow {
+    data class Header(val text: String) : MenuRow
+    data class Item(val trackIndex: Int, val track: Track) : MenuRow
+}
+
+private fun buildMenuRows(sections: List<MenuSection>): List<MenuRow> {
+    val rows = ArrayList<MenuRow>()
+    var t = 0
+    for (section in sections) {
+        rows.add(MenuRow.Header(section.heading))
+        for (track in section.tracks) {
+            rows.add(MenuRow.Item(t, track))
+            t++
+        }
+    }
+    return rows
+}
+
+// Emulates the web's scrollIntoView(block:'nearest'): scroll the minimum needed
+// to reveal `index` — align to top if it's above the viewport, nudge up if it's
+// below, no-op if already visible.
+private suspend fun bringNearest(state: LazyListState, index: Int) {
+    val info = state.layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (item == null) {
+        state.animateScrollToItem(index)
+        return
+    }
+    val start = info.viewportStartOffset
+    val end = info.viewportEndOffset
+    if (item.offset < start) {
+        state.animateScrollToItem(index)
+    } else if (item.offset + item.size > end) {
+        state.animateScrollBy(((item.offset + item.size) - end).toFloat())
+    }
+}
+
+@Composable
+private fun MenuOverlay(
+    kind: MenuKind,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sections = remember(kind) { menuSections(kind) }
+    val tracks = remember(kind) { menuTracks(kind) }
+    val count = tracks.size
+    val rows = remember(kind) { buildMenuRows(sections) }
+    // trackIndex -> LazyColumn row index (rows include the section headers).
+    val trackToRow = remember(kind) {
+        IntArray(count).also { arr ->
+            rows.forEachIndexed { i, r -> if (r is MenuRow.Item) arr[r.trackIndex] = i }
+        }
+    }
+
+    var highlight by remember(kind) { mutableIntStateOf(selectedIndex.coerceIn(0, count - 1)) }
+    var dir by remember(kind) { mutableIntStateOf(0) } // -1 up, +1 down, 0 on open
+    val listState = rememberLazyListState()
+    val focus = remember { FocusRequester() }
+
+    // Target-scroll: keep a LEAD-row trail behind the highlight by revealing a
+    // row LEAD ahead in the travel direction; snap the container fully to
+    // top/bottom near the ends so the section heading / last row isn't clipped.
+    LaunchedEffect(highlight) {
+        val lead = 3
+        when {
+            highlight <= lead -> listState.animateScrollToItem(0)
+            highlight >= count - 1 - lead -> listState.animateScrollToItem(rows.lastIndex)
+            else -> {
+                val leadTrack = (highlight + dir * lead).coerceIn(0, count - 1)
+                bringNearest(listState, trackToRow[leadTrack])
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x99000000)) // scrim (~0.6 black), matches the web overlay
+            .focusRequester(focus)
+            .focusable()
+            .onKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (e.key) {
+                    Key.DirectionUp -> {
+                        if (highlight > 0) { dir = -1; highlight-- }
+                        true
+                    }
+                    Key.DirectionDown -> {
+                        if (highlight < count - 1) { dir = 1; highlight++ }
+                        true
+                    }
+                    // Trap Left/Right so focus can't escape to the pills behind.
+                    Key.DirectionLeft, Key.DirectionRight -> true
+                    Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
+                        onSelect(highlight)
+                        onDismiss()
+                        true
+                    }
+                    else -> false
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .width(620.dp)
+                .heightIn(max = 560.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.22f)),
+            contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(rows) { row ->
+                when (row) {
+                    is MenuRow.Header -> MenuSectionHeader(row.text)
+                    is MenuRow.Item -> MenuItemRow(
+                        track = row.track,
+                        focused = row.trackIndex == highlight,
+                        selected = row.trackIndex == selectedIndex,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuSectionHeader(text: String) {
+    Text(
+        text = text.uppercase(),
+        color = MutedColor,
+        fontFamily = VarelaRound,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.W700,
+        letterSpacing = 1.sp,
+    )
+}
+
+@Composable
+private fun MenuItemRow(track: Track, focused: Boolean, selected: Boolean) {
+    val scale by animateFloatAsState(
+        targetValue = if (focused) 1.02f else 1f,
+        animationSpec = tween(160, easing = FastOutSlowInEasing),
+        label = "menuItemScale",
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (focused) FocusColor else Color.White.copy(alpha = 0.22f))
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (selected) "${track.label} ✔" else track.label,
+            color = if (focused) BgColor else TextColor,
+            fontFamily = VarelaRound,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.W700,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(16.dp))
+        Text(
+            text = track.meta,
+            color = (if (focused) BgColor else TextColor).copy(alpha = 0.7f),
+            fontFamily = VarelaRound,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.W600,
+            maxLines = 1,
+        )
+    }
 }
 
 // ----------------------------------------------------------------
