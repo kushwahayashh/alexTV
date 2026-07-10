@@ -111,18 +111,23 @@ private val FocusColor = Color(0xFFFFFFFF)
 // typography matches the old Flutter/Dart player exactly.
 private val VarelaRound = FontFamily(Font(R.font.varela_round))
 
+private const val SUBTITLE_TEXT_SIZE_FRACTION = 0.045f
+
 private fun PlayerView.applyVarelaRoundSubtitleStyle() {
     val subtitleTypeface = ResourcesCompat.getFont(context, R.font.varela_round)
-    subtitleView?.setStyle(
-        CaptionStyleCompat(
-            android.graphics.Color.WHITE,
-            android.graphics.Color.TRANSPARENT,
-            android.graphics.Color.TRANSPARENT,
-            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
-            android.graphics.Color.BLACK,
-            subtitleTypeface,
-        ),
-    )
+    subtitleView?.apply {
+        setStyle(
+            CaptionStyleCompat(
+                android.graphics.Color.WHITE,
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                android.graphics.Color.BLACK,
+                subtitleTypeface,
+            ),
+        )
+        setFractionalTextSize(SUBTITLE_TEXT_SIZE_FRACTION)
+    }
 }
 
 private const val SEEK_STEP_MS = 10_000L
