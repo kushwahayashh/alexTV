@@ -364,8 +364,9 @@ export function VideoPlayer({
       {/* Audio / Subtitles menu — same modal UI as the main app's quality picker */}
       {menuOpen && (
         <div className="player-overlay">
-          <div className="player-modal" ref={modalRef}>
-            {(() => {
+          <div className="player-modal">
+            <div className="player-modal__scroll" ref={modalRef}>
+              {(() => {
               let gi = -1 // running index across all sections
               return MENUS[menuOpen].map((section) => (
                 <div key={section.heading} className="player-menu-section">
@@ -394,6 +395,7 @@ export function VideoPlayer({
                 </div>
               ))
             })()}
+            </div>
           </div>
         </div>
       )}

@@ -201,27 +201,53 @@ body {
 }
 
 /* ---------- Pop-up menus (Subtitles / Audio) ---------- */
-/* Modal shell copied 1:1 from the main app's quality picker
-   (src/styles.css .player-overlay / .player-modal / .player-list / .player-item)
-   so the Audio menu matches it exactly. */
+/* Styled to match the Android (Compose) player menu: a solid dark panel over a
+   plain dark scrim (no backdrop blur), capped at 70vh. On TV, Compose can't
+   backdrop-blur the video SurfaceView, so the app uses a solid panel for
+   readability — this mirror keeps the two players looking identical. */
 .player-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .player-modal {
-  background: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(12px);
+  position: relative;
+  background: #1a1a20;
   border-radius: 16px;
-  padding: 36px 44px;
   width: 620px;
-  max-height: 80vh;
+  max-height: 70vh;
+  overflow: hidden;
+}
+/* Top/bottom fades so rows dissolve into the panel instead of hard-clipping at
+   the scroll edges. Pinned to the frame, above the scroll content but below no
+   pointer capture. On Compose this maps to a Box overlay with a vertical
+   Brush.verticalGradient at each edge. */
+.player-modal::before,
+.player-modal::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 36px;
+  pointer-events: none;
+  z-index: 1;
+}
+.player-modal::before {
+  top: 0;
+  background: linear-gradient(180deg, #1a1a20 0%, rgba(26, 26, 32, 0) 100%);
+}
+.player-modal::after {
+  bottom: 0;
+  background: linear-gradient(0deg, #1a1a20 0%, rgba(26, 26, 32, 0) 100%);
+}
+.player-modal__scroll {
+  max-height: inherit;
   overflow-y: auto;
+  padding: 36px 44px;
   /* Room from the edges when a focused row is scrolled into view (matches the
      homepage's scroll-padding-top used with scrollIntoView). */
   scroll-padding: 24px 0;
@@ -230,7 +256,7 @@ body {
   flex-direction: column;
   gap: 18px;
 }
-.player-modal::-webkit-scrollbar {
+.player-modal__scroll::-webkit-scrollbar {
   display: none;
 }
 .player-modal__title {

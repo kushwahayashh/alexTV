@@ -1077,8 +1077,11 @@ private fun MenuOverlay(
             },
         contentAlignment = Alignment.Center,
     ) {
-        LazyColumn(
-            state = listState,
+        // Panel frame: clips the scroll list and hosts the top/bottom edge fades
+        // so rows dissolve into the panel instead of hard-clipping at the scroll
+        // edges. Mirrors the React .player-modal (frame) / .player-modal__scroll
+        // (list) split, with the fades ported from its ::before/::after gradients.
+        Box(
             modifier = Modifier
                 .width(620.dp)
                 // max-height: 70vh.
@@ -1090,25 +1093,55 @@ private fun MenuOverlay(
                 // so a translucent panel reads washed out here. Solid keeps text
                 // crisp — the glass look stays in the React player-ui only.
                 .background(Color(0xFF1A1A20)),
-            contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
-            // 10dp base gap mirrors .player-list gap. Section headers carry
-            // extra top/bottom padding to reproduce React's three-level spacing:
-            // 18dp between sections, 12dp header-to-first-item, 10dp item-to-item.
-            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            itemsIndexed(rows) { index, row ->
-                when (row) {
-                    is MenuRow.Header -> MenuSectionHeader(
-                        text = row.text,
-                        isFirst = index == 0,
-                    )
-                    is MenuRow.Item -> MenuItemRow(
-                        track = row.track,
-                        focused = row.trackIndex == highlight,
-                        selected = row.trackIndex == selectedIndex,
-                    )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
+                // 10dp base gap mirrors .player-list gap. Section headers carry
+                // extra top/bottom padding to reproduce React's three-level spacing:
+                // 18dp between sections, 12dp header-to-first-item, 10dp item-to-item.
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                itemsIndexed(rows) { index, row ->
+                    when (row) {
+                        is MenuRow.Header -> MenuSectionHeader(
+                            text = row.text,
+                            isFirst = index == 0,
+                        )
+                        is MenuRow.Item -> MenuItemRow(
+                            track = row.track,
+                            focused = row.trackIndex == highlight,
+                            selected = row.trackIndex == selectedIndex,
+                        )
+                    }
                 }
             }
+
+            // 36dp fades from the panel colour to transparent at each edge, ported
+            // 1:1 from the web .player-modal::before / ::after gradients.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF1A1A20), Color(0x001A1A20)),
+                        ),
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0x001A1A20), Color(0xFF1A1A20)),
+                        ),
+                    ),
+            )
         }
     }
 }
