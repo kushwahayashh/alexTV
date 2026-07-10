@@ -143,12 +143,20 @@ private data class AudioTrackOption(
     val selected: Boolean,
 )
 
-private val SUBTITLE_ORG = listOf(
-    Track("org-en", "English", "Embedded"),
-    Track("org-en-sdh", "English (SDH)", "Embedded"),
-    Track("org-es", "Spanish", "Embedded"),
+/**
+ * A real embedded (ORG) text track from ExoPlayer. Same shape as
+ * [AudioTrackOption] — [group]/[trackIndex] locate it for a
+ * [TrackSelectionOverride]; [selected] marks the one currently showing.
+ */
+private data class TextTrackOption(
+    val group: TrackGroup,
+    val trackIndex: Int,
+    val track: Track,
+    val selected: Boolean,
 )
 
+// ORG subs are now real (built at runtime from embedded text tracks). WebSubs
+// remain mock, ported from the React player-ui.
 private val SUBTITLE_WEB = listOf(
     Track("web-en", "English", "SRT"),
     Track("web-es", "Spanish", "SRT"),
@@ -233,13 +241,57 @@ private fun audioOptions(tracks: Tracks): List<AudioTrackOption> {
     return out
 }
 
-// Mock subtitle sections (still ported from the React player-ui). Audio sections
-// are built at runtime from real tracks, so MenuOverlay takes its sections as a
-// parameter rather than deriving them from the kind.
-private val SUBTITLE_SECTIONS = listOf(
-    MenuSection("ORG subs", SUBTITLE_ORG),
-    MenuSection("WebSubs", SUBTITLE_WEB),
-)
+// ---- Real embedded (ORG) text track extraction from ExoPlayer ----
+
+// Human label for a text track: explicit format label -> language display name
+// (en -> "English") -> a numbered fallback.
+private fun textLabel(format: Format, ordinal: Int): String {
+    format.label?.takeIf { it.isNotBlank() }?.let { return it }
+    val lang = format.language
+    if (!lang.isNullOrBlank() && lang != C.LANGUAGE_UNDETERMINED) {
+        val loc = java.util.Locale.forLanguageTag(lang)
+        val display = loc.displayLanguage
+        if (display.isNotBlank()) return display.replaceFirstChar { it.uppercase() }
+    }
+    return "Track ${ordinal + 1}"
+}
+
+// Read the current embedded text tracks. Only selectable (supported) tracks are
+// included; `selected` marks the one currently showing (if any).
+private fun textOptions(tracks: Tracks): List<TextTrackOption> {
+    val out = ArrayList<TextTrackOption>()
+    var ordinal = 0
+    for (group in tracks.groups) {
+        if (group.type != C.TRACK_TYPE_TEXT) continue
+        for (i in 0 until group.length) {
+            if (!group.isTrackSupported(i)) continue
+            val format = group.getTrackFormat(i)
+            // Skip embedded caption channels that carry no real track (CEA-608/708
+            // are always advertised even when empty); they'd show as blank rows.
+            if (format.sampleMimeType == MimeTypes.APPLICATION_CEA608 ||
+                format.sampleMimeType == MimeTypes.APPLICATION_CEA708
+            ) continue
+            out.add(
+                TextTrackOption(
+                    group = group.mediaTrackGroup,
+                    trackIndex = i,
+                    track = Track(
+                        id = "sub-$ordinal",
+                        label = textLabel(format, ordinal),
+                        meta = "Embedded",
+                    ),
+                    selected = group.isTrackSelected(i),
+                ),
+            )
+            ordinal++
+        }
+    }
+    return out
+}
+
+// The mock WebSubs section (ported from the React player-ui). The ORG section
+// is built at runtime from real embedded text tracks and prepended to this.
+private val WEBSUBS_SECTION = MenuSection("WebSubs", SUBTITLE_WEB)
 
 /**
  * Full-screen player activity.
@@ -391,11 +443,10 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
 
-    // Audio / Subtitles menu state. `menuKind` is null when no menu is open;
-    // the selected track index is remembered per menu. `menuReturnFocus` is the
-    // pill to restore focus to when the menu closes.
+    // Audio / Subtitles menu state. `menuKind` is null when no menu is open.
+    // Track selection (audio + subtitles) is read from the player, not stored
+    // here. `menuReturnFocus` is the pill to restore focus to when a menu closes.
     var menuKind by remember { mutableStateOf<MenuKind?>(null) }
-    var selectedSubtitle by remember { mutableIntStateOf(0) }
     var menuReturnFocus by remember { mutableStateOf<FocusRequester?>(null) }
 
     // Live audio tracks parsed by ExoPlayer; refreshed on every tracks change so
@@ -576,10 +627,52 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
                         onDismiss = { menuKind = null },
                     )
                 } else {
+                    // Subtitles menu. ORG subs are real embedded text tracks with
+                    // a leading "Off" row; WebSubs stay mock. The flat menu index
+                    // maps to: 0 = Off, 1..N = ORG tracks, then the WebSubs rows.
+                    val textTracks = remember(currentTracks) { textOptions(currentTracks) }
+                    val orgRows = remember(textTracks) {
+                        buildList {
+                            add(Track("sub-off", "Off", ""))
+                            addAll(textTracks.map { it.track })
+                        }
+                    }
+                    val sections = remember(orgRows) {
+                        listOf(MenuSection("ORG subs", orgRows), WEBSUBS_SECTION)
+                    }
+                    // Real selection drives the check: an active ORG track -> its
+                    // row (offset by the Off row); otherwise Off (index 0).
+                    val activeOrg = textTracks.indexOfFirst { it.selected }
+                    val selectedIdx = if (activeOrg >= 0) activeOrg + 1 else 0
+
+                    fun applyOff() {
+                        player.trackSelectionParameters =
+                            player.trackSelectionParameters.buildUpon()
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                                .build()
+                    }
+                    fun applyOrg(opt: TextTrackOption) {
+                        player.trackSelectionParameters =
+                            player.trackSelectionParameters.buildUpon()
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                .setOverrideForType(
+                                    TrackSelectionOverride(opt.group, opt.trackIndex)
+                                )
+                                .build()
+                    }
+
                     MenuOverlay(
-                        sections = SUBTITLE_SECTIONS,
-                        selectedIndex = selectedSubtitle,
-                        onSelect = { idx -> selectedSubtitle = idx },
+                        sections = sections,
+                        selectedIndex = selectedIdx,
+                        onSelect = { idx ->
+                            when {
+                                idx == 0 -> applyOff()
+                                idx <= textTracks.size -> applyOrg(textTracks[idx - 1])
+                                // WebSubs range: mock, no real effect (menu closes).
+                                else -> Unit
+                            }
+                        },
                         onDismiss = { menuKind = null },
                     )
                 }
