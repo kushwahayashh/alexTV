@@ -1093,7 +1093,10 @@ private fun MenuOverlay(
         ) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                // Fill width but wrap height so a short menu (e.g. Audio's 3
+                // tracks) stays compact; the wrapper Box's heightIn caps a long
+                // menu at 70vh. fillMaxSize here would force every menu to 70vh.
+                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
                 // 10dp base gap mirrors .player-list gap. Section headers carry
                 // extra top/bottom padding to reproduce React's three-level spacing:
