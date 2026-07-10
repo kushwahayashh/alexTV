@@ -807,13 +807,16 @@ private fun MenuOverlay(
     val focus = remember { FocusRequester() }
 
     // Target-scroll: keep a LEAD-row trail behind the highlight by revealing a
-    // row LEAD ahead in the travel direction; snap the container fully to
-    // top/bottom near the ends so the section heading / last row isn't clipped.
+    // row LEAD ahead in the travel direction. Near the top we snap fully to 0 so
+    // the first section heading isn't clipped; near the bottom we DON'T snap —
+    // bringNearest reveals the lead row (which clamps to the last track) with the
+    // minimum scroll, mirroring the web's scrollIntoView(block:'nearest') /
+    // scrollTo(scrollHeight). Snapping to the last item here would top-align it
+    // and yank the list all the way to the end.
     LaunchedEffect(highlight) {
         val lead = 3
         when {
             highlight <= lead -> listState.animateScrollToItem(0)
-            highlight >= count - 1 - lead -> listState.animateScrollToItem(rows.lastIndex)
             else -> {
                 val leadTrack = (highlight + dir * lead).coerceIn(0, count - 1)
                 bringNearest(listState, trackToRow[leadTrack])
@@ -826,7 +829,7 @@ private fun MenuOverlay(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x99000000)) // scrim (~0.6 black), matches the web overlay
+            .background(Color(0x99000000)) // scrim: 0.6 black, matches the web .player-overlay (its backdrop blur(8px) can't be applied over the video SurfaceView)
             .focusRequester(focus)
             .focusable()
             .onKeyEvent { e ->
@@ -856,13 +859,15 @@ private fun MenuOverlay(
             state = listState,
             modifier = Modifier
                 .width(620.dp)
-                // Cap the height smaller so the modal doesn't tower on TV; it
-                // still wraps content when there are only a few tracks.
-                .heightIn(max = maxHeight * 0.6f)
+                // max-height: 80vh, matching the React .player-modal.
+                .heightIn(max = maxHeight * 0.8f)
                 .clip(RoundedCornerShape(16.dp))
-                // Solid dark background (the React modal is translucent glass,
-                // but on TV we want a solid panel so text stays readable).
-                .background(Color(0xFF1A1A20)),
+                // Translucent white glass, matching the React .player-modal
+                // (rgba(255,255,255,0.22)). Note: React also applies
+                // backdrop-filter: blur(12px); Compose can't backdrop-blur the
+                // video (it's a SurfaceView), so the panel is translucent but
+                // the video behind it stays sharp.
+                .background(Color.White.copy(alpha = 0.22f)),
             contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
             // 10dp base gap mirrors .player-list gap. Section headers carry
             // extra top/bottom padding to reproduce React's three-level spacing:
