@@ -82,8 +82,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -115,19 +120,27 @@ private const val HIDE_DELAY_MS = 4_000L
 private const val DESIGN_WIDTH = 1260f
 
 // ----------------------------------------------------------------
-// Mock Audio / Subtitles menu data — ported 1:1 from the React
-// player-ui (player-ui/src/VideoPlayer.tsx). Both menus render with the same
-// modal UI as the main app's quality picker.
+// Menu data models.
+//
+// Subtitles are still mock (ported 1:1 from the React player-ui). Audio is now
+// REAL: built from ExoPlayer's parsed tracks at runtime (see audioOptions()).
+// Both render with the same modal UI as the main app's quality picker.
 // ----------------------------------------------------------------
 
 private data class Track(val id: String, val label: String, val meta: String)
 private data class MenuSection(val heading: String, val tracks: List<Track>)
 private enum class MenuKind { AUDIO, SUBTITLES }
 
-private val AUDIO_TRACKS = listOf(
-    Track("en-51", "English", "5.1 · AC3"),
-    Track("en-stereo", "English", "Stereo · AAC"),
-    Track("es-stereo", "Spanish", "Stereo · AAC"),
+/**
+ * A real audio track from ExoPlayer. [group]/[trackIndex] locate it inside
+ * [Tracks] so a [TrackSelectionOverride] can select it. [track] is the
+ * display row (label + meta) shown in the menu.
+ */
+private data class AudioTrackOption(
+    val group: TrackGroup,
+    val trackIndex: Int,
+    val track: Track,
+    val selected: Boolean,
 )
 
 private val SUBTITLE_ORG = listOf(
@@ -148,19 +161,85 @@ private val SUBTITLE_WEB = listOf(
     Track("web-ar", "Arabic", "SRT"),
 )
 
-// Per-menu config: an ordered list of sections (each with its own heading).
-// D-pad navigation flows through every section as one continuous index; the
-// headings only divide the list visually.
-private fun menuSections(kind: MenuKind): List<MenuSection> = when (kind) {
-    MenuKind.AUDIO -> listOf(MenuSection("Audio Tracks", AUDIO_TRACKS))
-    MenuKind.SUBTITLES -> listOf(
-        MenuSection("ORG subs", SUBTITLE_ORG),
-        MenuSection("WebSubs", SUBTITLE_WEB),
-    )
+// ---- Real audio track extraction from ExoPlayer ----
+
+// Human label for an audio track: explicit format label -> language display
+// name (en -> "English") -> a numbered fallback.
+private fun audioLabel(format: Format, ordinal: Int): String {
+    format.label?.takeIf { it.isNotBlank() }?.let { return it }
+    val lang = format.language
+    if (!lang.isNullOrBlank() && lang != C.LANGUAGE_UNDETERMINED) {
+        val loc = java.util.Locale.forLanguageTag(lang)
+        val display = loc.displayLanguage
+        if (display.isNotBlank()) return display.replaceFirstChar { it.uppercase() }
+    }
+    return "Audio ${ordinal + 1}"
 }
 
-private fun menuTracks(kind: MenuKind): List<Track> =
-    menuSections(kind).flatMap { it.tracks }
+// Meta line: channel layout + codec, e.g. "5.1 · AC3". Either part may be
+// omitted if unknown.
+private fun audioMeta(format: Format): String {
+    val channels = when (format.channelCount) {
+        1 -> "Mono"
+        2 -> "Stereo"
+        6 -> "5.1"
+        7 -> "6.1"
+        8 -> "7.1"
+        Format.NO_VALUE, 0 -> null
+        else -> "${format.channelCount}ch"
+    }
+    val codec = when (format.sampleMimeType) {
+        MimeTypes.AUDIO_AAC -> "AAC"
+        MimeTypes.AUDIO_AC3 -> "AC3"
+        MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> "EAC3"
+        MimeTypes.AUDIO_AC4 -> "AC4"
+        MimeTypes.AUDIO_DTS -> "DTS"
+        MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
+        MimeTypes.AUDIO_TRUEHD -> "TrueHD"
+        MimeTypes.AUDIO_OPUS -> "Opus"
+        MimeTypes.AUDIO_VORBIS -> "Vorbis"
+        MimeTypes.AUDIO_FLAC -> "FLAC"
+        MimeTypes.AUDIO_MPEG, MimeTypes.AUDIO_MPEG_L2 -> "MP3"
+        else -> format.sampleMimeType?.substringAfter('/')?.uppercase()
+    }
+    return listOfNotNull(channels, codec).joinToString(" · ")
+}
+
+// Read the current audio tracks from the player. Only selectable (supported)
+// tracks are included; `selected` marks the one ExoPlayer is currently playing.
+private fun audioOptions(tracks: Tracks): List<AudioTrackOption> {
+    val out = ArrayList<AudioTrackOption>()
+    var ordinal = 0
+    for (group in tracks.groups) {
+        if (group.type != C.TRACK_TYPE_AUDIO) continue
+        for (i in 0 until group.length) {
+            if (!group.isTrackSupported(i)) continue
+            val format = group.getTrackFormat(i)
+            out.add(
+                AudioTrackOption(
+                    group = group.mediaTrackGroup,
+                    trackIndex = i,
+                    track = Track(
+                        id = "audio-$ordinal",
+                        label = audioLabel(format, ordinal),
+                        meta = audioMeta(format),
+                    ),
+                    selected = group.isTrackSelected(i),
+                ),
+            )
+            ordinal++
+        }
+    }
+    return out
+}
+
+// Mock subtitle sections (still ported from the React player-ui). Audio sections
+// are built at runtime from real tracks, so MenuOverlay takes its sections as a
+// parameter rather than deriving them from the kind.
+private val SUBTITLE_SECTIONS = listOf(
+    MenuSection("ORG subs", SUBTITLE_ORG),
+    MenuSection("WebSubs", SUBTITLE_WEB),
+)
 
 /**
  * Full-screen player activity.
@@ -316,9 +395,12 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
     // the selected track index is remembered per menu. `menuReturnFocus` is the
     // pill to restore focus to when the menu closes.
     var menuKind by remember { mutableStateOf<MenuKind?>(null) }
-    var selectedAudio by remember { mutableIntStateOf(0) }
     var selectedSubtitle by remember { mutableIntStateOf(0) }
     var menuReturnFocus by remember { mutableStateOf<FocusRequester?>(null) }
+
+    // Live audio tracks parsed by ExoPlayer; refreshed on every tracks change so
+    // the Audio menu (and its current-selection check) stays in sync.
+    var currentTracks by remember { mutableStateOf(player.currentTracks) }
 
     // Bumped on every key press; restarts the auto-hide timer (mirrors the old
     // Dart `_bumpActivity()`).
@@ -340,6 +422,10 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
                     initialized = true
                     duration = player.duration.coerceAtLeast(0L)
                 }
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                currentTracks = tracks
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -460,14 +546,43 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
 
             // Audio / Subtitles menu — drawn above the controls with a scrim.
             menuKind?.let { kind ->
-                MenuOverlay(
-                    kind = kind,
-                    selectedIndex = if (kind == MenuKind.AUDIO) selectedAudio else selectedSubtitle,
-                    onSelect = { idx ->
-                        if (kind == MenuKind.AUDIO) selectedAudio = idx else selectedSubtitle = idx
-                    },
-                    onDismiss = { menuKind = null },
-                )
+                if (kind == MenuKind.AUDIO) {
+                    // Real audio tracks from ExoPlayer. Selecting one applies a
+                    // TrackSelectionOverride so playback actually switches.
+                    val options = remember(currentTracks) { audioOptions(currentTracks) }
+                    val sections = remember(options) {
+                        val rows = if (options.isEmpty()) {
+                            listOf(Track("audio-none", "Default", ""))
+                        } else {
+                            options.map { it.track }
+                        }
+                        listOf(MenuSection("Audio Tracks", rows))
+                    }
+                    val selectedIdx = options.indexOfFirst { it.selected }.coerceAtLeast(0)
+                    MenuOverlay(
+                        sections = sections,
+                        selectedIndex = selectedIdx,
+                        onSelect = { idx ->
+                            options.getOrNull(idx)?.let { opt ->
+                                player.trackSelectionParameters =
+                                    player.trackSelectionParameters
+                                        .buildUpon()
+                                        .setOverrideForType(
+                                            TrackSelectionOverride(opt.group, opt.trackIndex)
+                                        )
+                                        .build()
+                            }
+                        },
+                        onDismiss = { menuKind = null },
+                    )
+                } else {
+                    MenuOverlay(
+                        sections = SUBTITLE_SECTIONS,
+                        selectedIndex = selectedSubtitle,
+                        onSelect = { idx -> selectedSubtitle = idx },
+                        onDismiss = { menuKind = null },
+                    )
+                }
             }
           }
         }
@@ -796,24 +911,25 @@ private suspend fun bringNearest(state: LazyListState, index: Int) {
 
 @Composable
 private fun MenuOverlay(
-    kind: MenuKind,
+    sections: List<MenuSection>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sections = remember(kind) { menuSections(kind) }
-    val tracks = remember(kind) { menuTracks(kind) }
+    val tracks = remember(sections) { sections.flatMap { it.tracks } }
     val count = tracks.size
-    val rows = remember(kind) { buildMenuRows(sections) }
+    val rows = remember(sections) { buildMenuRows(sections) }
     // trackIndex -> LazyColumn row index (rows include the section headers).
-    val trackToRow = remember(kind) {
+    val trackToRow = remember(sections) {
         IntArray(count).also { arr ->
             rows.forEachIndexed { i, r -> if (r is MenuRow.Item) arr[r.trackIndex] = i }
         }
     }
 
-    var highlight by remember(kind) { mutableIntStateOf(selectedIndex.coerceIn(0, count - 1)) }
-    var dir by remember(kind) { mutableIntStateOf(0) } // -1 up, +1 down, 0 on open
+    var highlight by remember(sections) {
+        mutableIntStateOf(selectedIndex.coerceIn(0, (count - 1).coerceAtLeast(0)))
+    }
+    var dir by remember(sections) { mutableIntStateOf(0) } // -1 up, +1 down, 0 on open
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
 
@@ -872,8 +988,8 @@ private fun MenuOverlay(
             state = listState,
             modifier = Modifier
                 .width(620.dp)
-                // max-height: 80vh, matching the React .player-modal.
-                .heightIn(max = maxHeight * 0.8f)
+                // max-height: 70vh.
+                .heightIn(max = maxHeight * 0.7f)
                 .clip(RoundedCornerShape(16.dp))
                 // Solid dark panel on TV. The React .player-modal is translucent
                 // frosted glass (rgba(255,255,255,0.22) + backdrop blur(12px)),
