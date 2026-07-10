@@ -65,6 +65,40 @@ Future<Map<String, dynamic>> _getJson(String path) async {
   return jsonDecode(res.body) as Map<String, dynamic>;
 }
 
+/// A FebBox web subtitle for a file, scraped + converted to WebVTT by the
+/// backend. English-only; [url] is an absolute URL serving the VTT file.
+class WebSub {
+  final String label;
+  final String url;
+
+  const WebSub({required this.label, required this.url});
+}
+
+/// Strip a subtitle filename down to a menu label: drop the extension and
+/// collapse dots/underscores to spaces so the release name is readable.
+String _cleanSubLabel(String fileName) {
+  var s = fileName.replaceAll(RegExp(r'\.(srt|vtt|ass)$', caseSensitive: false), '');
+  s = s.replaceAll(RegExp(r'[._]+'), ' ').trim();
+  return s.isEmpty ? 'English' : s;
+}
+
+/// Fetch FebBox web subtitles for a file (by [fid]). The backend already filters
+/// to English and serves VTT; we de-dupe by label and resolve relative URLs.
+Future<List<WebSub>> getWebSubs(int fid) async {
+  final data = await _getJson('/api/subtitles?fid=$fid');
+  final raw = (data['subtitles'] as List?) ?? const [];
+  final seen = <String>{};
+  final out = <WebSub>[];
+  for (final j in raw.cast<Map<String, dynamic>>()) {
+    final rel = (j['url'] ?? '') as String;
+    if (rel.isEmpty) continue;
+    final label = _cleanSubLabel((j['langName'] ?? j['lang'] ?? 'English') as String);
+    if (!seen.add(label)) continue; // drop duplicate filenames
+    out.add(WebSub(label: label, url: rel.startsWith('http') ? rel : '$_base$rel'));
+  }
+  return out;
+}
+
 /// Resolve a TMDB title+year to a ShowBox ID.
 Future<int> _resolveTitle(String title, String year, String type) async {
   final data = await _getJson(

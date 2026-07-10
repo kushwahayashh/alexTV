@@ -30,6 +30,16 @@ class MainActivity : FlutterActivity() {
                             putExtra("url", url)
                             putExtra("ext", call.argument<String>("ext") ?: "")
                             putExtra("title", call.argument<String>("title") ?: "")
+                            // Web (FebBox) subtitles resolved by Dart: parallel
+                            // label/URL lists, attached to the media item natively.
+                            putStringArrayListExtra(
+                                "subLabels",
+                                ArrayList(call.argument<List<String>>("subLabels") ?: emptyList()),
+                            )
+                            putStringArrayListExtra(
+                                "subUrls",
+                                ArrayList(call.argument<List<String>>("subUrls") ?: emptyList()),
+                            )
                         }
                         startActivity(intent)
                         result.success(true)

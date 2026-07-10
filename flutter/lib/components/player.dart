@@ -38,6 +38,7 @@ class _PlayerState extends State<Player> {
   _Phase _phase = _Phase.loading;
   List<VideoFile> _files = [];
   List<StreamLink> _links = [];
+  List<WebSub> _webSubs = const [];
   String _error = '';
 
   @override
@@ -79,10 +80,15 @@ class _PlayerState extends State<Player> {
   void _pickFile(VideoFile file) async {
     setState(() => _phase = _Phase.loading);
     try {
+      // Fetch stream links and FebBox web subtitles during this loading step, so
+      // launching the player is instant. Subs are optional — a failure there
+      // must not block playback, so fall back to none.
       final links = await getLinks(file.fid);
+      final subs = await getWebSubs(file.fid).catchError((_) => <WebSub>[]);
       if (!mounted) return;
       setState(() {
         _links = links;
+        _webSubs = subs;
         _phase = links.isNotEmpty ? _Phase.links : _Phase.error;
         if (links.isEmpty) _error = 'No stream links for this file.';
       });
@@ -104,6 +110,9 @@ class _PlayerState extends State<Player> {
         'url': link.url,
         'ext': link.ext,
         'title': widget.media.title,
+        // Web (FebBox) subtitles for the picked file, attached natively.
+        'subLabels': _webSubs.map((s) => s.label).toList(),
+        'subUrls': _webSubs.map((s) => s.url).toList(),
       });
     } catch (e) {
       if (!mounted) return;

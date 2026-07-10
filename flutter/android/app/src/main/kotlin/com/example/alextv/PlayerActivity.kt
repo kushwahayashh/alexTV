@@ -1,6 +1,7 @@
 package com.example.alextv
 
 import android.os.Bundle
+import android.net.Uri
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -144,30 +145,21 @@ private data class AudioTrackOption(
 )
 
 /**
- * A real embedded (ORG) text track from ExoPlayer. Same shape as
- * [AudioTrackOption] — [group]/[trackIndex] locate it for a
- * [TrackSelectionOverride]; [selected] marks the one currently showing.
+ * A real text track from ExoPlayer. Same shape as [AudioTrackOption] —
+ * [group]/[trackIndex] locate it for a [TrackSelectionOverride]; [selected]
+ * marks the one currently showing. [isWeb] distinguishes a sideloaded FebBox
+ * (WebSubs) track from an embedded (ORG) one.
  */
 private data class TextTrackOption(
     val group: TrackGroup,
     val trackIndex: Int,
     val track: Track,
     val selected: Boolean,
+    val isWeb: Boolean,
 )
 
-// ORG subs are now real (built at runtime from embedded text tracks). WebSubs
-// remain mock, ported from the React player-ui.
-private val SUBTITLE_WEB = listOf(
-    Track("web-en", "English", "SRT"),
-    Track("web-es", "Spanish", "SRT"),
-    Track("web-fr", "French", "SRT"),
-    Track("web-de", "German", "SRT"),
-    Track("web-it", "Italian", "SRT"),
-    Track("web-pt", "Portuguese", "SRT"),
-    Track("web-ja", "Japanese", "SRT"),
-    Track("web-ko", "Korean", "SRT"),
-    Track("web-ar", "Arabic", "SRT"),
-)
+// Both subtitle sections are now real: ORG = embedded text tracks, WebSubs =
+// sideloaded FebBox tracks. See textOptions() and the Subtitles menu block.
 
 // ---- Real audio track extraction from ExoPlayer ----
 
@@ -256,9 +248,11 @@ private fun textLabel(format: Format, ordinal: Int): String {
     return "Track ${ordinal + 1}"
 }
 
-// Read the current embedded text tracks. Only selectable (supported) tracks are
-// included; `selected` marks the one currently showing (if any).
-private fun textOptions(tracks: Tracks): List<TextTrackOption> {
+// Read the current text tracks. Only selectable (supported) tracks are
+// included; `selected` marks the one currently showing (if any). A track whose
+// label is in [webLabels] is a sideloaded FebBox subtitle (WebSubs); everything
+// else is embedded (ORG).
+private fun textOptions(tracks: Tracks, webLabels: Set<String>): List<TextTrackOption> {
     val out = ArrayList<TextTrackOption>()
     var ordinal = 0
     for (group in tracks.groups) {
@@ -271,16 +265,19 @@ private fun textOptions(tracks: Tracks): List<TextTrackOption> {
             if (format.sampleMimeType == MimeTypes.APPLICATION_CEA608 ||
                 format.sampleMimeType == MimeTypes.APPLICATION_CEA708
             ) continue
+            val fmtLabel = format.label
+            val isWeb = fmtLabel != null && webLabels.contains(fmtLabel)
             out.add(
                 TextTrackOption(
                     group = group.mediaTrackGroup,
                     trackIndex = i,
                     track = Track(
                         id = "sub-$ordinal",
-                        label = textLabel(format, ordinal),
-                        meta = "Embedded",
+                        label = if (isWeb) (fmtLabel ?: "English") else textLabel(format, ordinal),
+                        meta = if (isWeb) "Web" else "Embedded",
                     ),
                     selected = group.isTrackSelected(i),
+                    isWeb = isWeb,
                 ),
             )
             ordinal++
@@ -289,9 +286,6 @@ private fun textOptions(tracks: Tracks): List<TextTrackOption> {
     return out
 }
 
-// The mock WebSubs section (ported from the React player-ui). The ORG section
-// is built at runtime from real embedded text tracks and prepended to this.
-private val WEBSUBS_SECTION = MenuSection("WebSubs", SUBTITLE_WEB)
 
 /**
  * Full-screen player activity.
@@ -326,6 +320,8 @@ class PlayerActivity : ComponentActivity() {
         const val EXTRA_URL = "url"
         const val EXTRA_EXT = "ext"
         const val EXTRA_TITLE = "title"
+        const val EXTRA_SUB_LABELS = "subLabels"
+        const val EXTRA_SUB_URLS = "subUrls"
     }
 
     private var player: ExoPlayer? = null
@@ -343,19 +339,33 @@ class PlayerActivity : ComponentActivity() {
             return
         }
 
-        val exo = createPlayer(url, ext, title)
+        // Web (FebBox) subtitles resolved by Dart: parallel label/URL lists. We
+        // attach each as an external VTT text track and remember the labels so
+        // the menu can tell web subs apart from embedded (ORG) ones.
+        val subLabels = intent.getStringArrayListExtra(EXTRA_SUB_LABELS) ?: arrayListOf()
+        val subUrls = intent.getStringArrayListExtra(EXTRA_SUB_URLS) ?: arrayListOf()
+        val webSubs = subLabels.zip(subUrls)
+        val webSubLabels = subLabels.toSet()
+
+        val exo = createPlayer(url, ext, title, webSubs)
         player = exo
 
         setContent {
             PlayerScreen(
                 player = exo,
                 title = title,
+                webSubLabels = webSubLabels,
                 onClose = { finish() },
             )
         }
     }
 
-    private fun createPlayer(url: String, ext: String, title: String): ExoPlayer {
+    private fun createPlayer(
+        url: String,
+        ext: String,
+        title: String,
+        webSubs: List<Pair<String, String>>,
+    ): ExoPlayer {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(BROWSER_UA)
             .setAllowCrossProtocolRedirects(true)
@@ -379,9 +389,21 @@ class PlayerActivity : ComponentActivity() {
             else -> null
         }
 
+        // Sideloaded web subtitles. The backend always serves WebVTT, so the MIME
+        // is fixed. Not marked default — the user opts in via the menu. The label
+        // survives onto the track Format so the menu can group it under WebSubs.
+        val subConfigs = webSubs.map { (label, u) ->
+            MediaItem.SubtitleConfiguration.Builder(Uri.parse(u))
+                .setMimeType(MimeTypes.TEXT_VTT)
+                .setLanguage("en")
+                .setLabel(label)
+                .build()
+        }
+
         val mediaItem = MediaItem.Builder()
             .setUri(url)
             .apply { mimeType?.let { setMimeType(it) } }
+            .setSubtitleConfigurations(subConfigs)
             .setMediaMetadata(
                 androidx.media3.common.MediaMetadata.Builder()
                     .setTitle(title)
@@ -435,7 +457,12 @@ private fun DesignScaler(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) {
+private fun PlayerScreen(
+    player: ExoPlayer,
+    title: String,
+    webSubLabels: Set<String>,
+    onClose: () -> Unit,
+) {
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var initialized by remember { mutableStateOf(false) }
@@ -627,23 +654,36 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
                         onDismiss = { menuKind = null },
                     )
                 } else {
-                    // Subtitles menu. ORG subs are real embedded text tracks with
-                    // a leading "Off" row; WebSubs stay mock. The flat menu index
-                    // maps to: 0 = Off, 1..N = ORG tracks, then the WebSubs rows.
-                    val textTracks = remember(currentTracks) { textOptions(currentTracks) }
-                    val orgRows = remember(textTracks) {
-                        buildList {
+                    // Subtitles menu. ORG subs = embedded text tracks (with a
+                    // leading "Off" row); WebSubs = sideloaded FebBox tracks.
+                    // Selecting either applies a TrackSelectionOverride (both are
+                    // real text tracks); Off disables the text type. The flat menu
+                    // index maps to: 0 = Off, then ORG tracks, then WebSubs tracks.
+                    val textTracks = remember(currentTracks, webSubLabels) {
+                        textOptions(currentTracks, webSubLabels)
+                    }
+                    val orgOpts = remember(textTracks) { textTracks.filter { !it.isWeb } }
+                    val webOpts = remember(textTracks) { textTracks.filter { it.isWeb } }
+                    // Selectable tracks in menu order (after the Off row).
+                    val ordered = remember(orgOpts, webOpts) { orgOpts + webOpts }
+
+                    val sections = remember(orgOpts, webOpts) {
+                        val org = buildList {
                             add(Track("sub-off", "Off", ""))
-                            addAll(textTracks.map { it.track })
+                            addAll(orgOpts.map { it.track })
                         }
+                        val web = if (webOpts.isEmpty()) {
+                            listOf(Track("web-none", "None", ""))
+                        } else {
+                            webOpts.map { it.track }
+                        }
+                        listOf(MenuSection("ORG subs", org), MenuSection("WebSubs", web))
                     }
-                    val sections = remember(orgRows) {
-                        listOf(MenuSection("ORG subs", orgRows), WEBSUBS_SECTION)
-                    }
-                    // Real selection drives the check: an active ORG track -> its
-                    // row (offset by the Off row); otherwise Off (index 0).
-                    val activeOrg = textTracks.indexOfFirst { it.selected }
-                    val selectedIdx = if (activeOrg >= 0) activeOrg + 1 else 0
+
+                    // Check follows real selection: an active track -> its row
+                    // (offset by the Off row); otherwise Off (index 0).
+                    val activeIdx = ordered.indexOfFirst { it.selected }
+                    val selectedIdx = if (activeIdx >= 0) activeIdx + 1 else 0
 
                     fun applyOff() {
                         player.trackSelectionParameters =
@@ -652,7 +692,7 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
                                 .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                                 .build()
                     }
-                    fun applyOrg(opt: TextTrackOption) {
+                    fun applyTrack(opt: TextTrackOption) {
                         player.trackSelectionParameters =
                             player.trackSelectionParameters.buildUpon()
                                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
@@ -668,8 +708,8 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
                         onSelect = { idx ->
                             when {
                                 idx == 0 -> applyOff()
-                                idx <= textTracks.size -> applyOrg(textTracks[idx - 1])
-                                // WebSubs range: mock, no real effect (menu closes).
+                                idx <= ordered.size -> applyTrack(ordered[idx - 1])
+                                // "None" placeholder in an empty WebSubs section.
                                 else -> Unit
                             }
                         },
