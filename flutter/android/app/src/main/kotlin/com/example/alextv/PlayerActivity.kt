@@ -47,8 +47,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -100,6 +104,14 @@ private val VarelaRound = FontFamily(Font(R.font.varela_round))
 
 private const val SEEK_STEP_MS = 10_000L
 private const val HIDE_DELAY_MS = 4_000L
+
+// Fixed design canvas width, mirroring Flutter's AppSizes.designWidth (1260) and
+// its _DesignScaler. TVs report a wide range of logical densities, so laying the
+// overlay out in raw dp makes it render zoomed-in on some sets and correct on
+// others. Instead we pin every dp/sp to a 1260-unit-wide canvas and uniformly
+// scale it to fill the real screen — so proportions match the rest of the app
+// (and the React player-ui) regardless of the TV's reported densityDpi.
+private const val DESIGN_WIDTH = 1260f
 
 // ----------------------------------------------------------------
 // Mock Audio / Subtitles menu data — ported 1:1 from the React
@@ -268,6 +280,28 @@ class PlayerActivity : ComponentActivity() {
 // Compose UI
 // ----------------------------------------------------------------
 
+/**
+ * Compose equivalent of Flutter's `_DesignScaler`: pins [content] to a fixed
+ * [DESIGN_WIDTH]-wide canvas and uniformly scales it to fill the screen by
+ * overriding [LocalDensity]. Every `.dp`/`.sp` below is then interpreted so
+ * that DESIGN_WIDTH design units span the full width — making the overlay
+ * canvas-independent (identical proportions on any TV, matching the main app
+ * and the React player-ui). fontScale is reset to 1 so the TV's system font
+ * scaling can't distort the design.
+ */
+@Composable
+private fun DesignScaler(content: @Composable () -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // constraints.maxWidth is the real screen width in physical px.
+        val scaledDensity = constraints.maxWidth / DESIGN_WIDTH
+        CompositionLocalProvider(
+            LocalDensity provides Density(density = scaledDensity, fontScale = 1f),
+        ) {
+            content()
+        }
+    }
+}
+
 @Composable
 private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) {
     var controlsVisible by remember { mutableStateOf(true) }
@@ -375,6 +409,10 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
             }
     ) {
         // Video surface — PlayerView with the built-in controller disabled.
+        // NOT wrapped in the design scaler: it must fill the real screen at true
+        // resolution. fillMaxSize resolves against parent pixel constraints, so
+        // the density override wouldn't distort it either — but keeping it here
+        // makes the intent explicit.
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -387,44 +425,50 @@ private fun PlayerScreen(player: ExoPlayer, title: String, onClose: () -> Unit) 
             modifier = Modifier.fillMaxSize()
         )
 
-        when {
-            errorText != null -> ErrorView(errorText!!)
+        // Overlay UI — scaled to the fixed design canvas so its proportions are
+        // identical on every TV regardless of reported density.
+        DesignScaler {
+          Box(Modifier.fillMaxSize()) {
+            when {
+                errorText != null -> ErrorView(errorText!!)
 
-            !initialized -> CircularProgressIndicator(
-                color = TextColor,
-                modifier = Modifier.align(Alignment.Center),
-            )
+                !initialized -> CircularProgressIndicator(
+                    color = TextColor,
+                    modifier = Modifier.align(Alignment.Center),
+                )
 
-            else -> {
-                ControlsOverlay(
-                    title = title,
-                    visible = controlsVisible,
-                    isPlaying = isPlaying,
-                    position = position,
-                    duration = duration,
-                    seekFocus = seekFocus,
-                    subFocus = subFocus,
-                    audioFocus = audioFocus,
-                    onTogglePlay = { togglePlay() },
-                    onSeek = { seekBy(it) },
-                    onOpenMenu = { kind ->
-                        menuReturnFocus = if (kind == MenuKind.AUDIO) audioFocus else subFocus
-                        menuKind = kind
+                else -> {
+                    ControlsOverlay(
+                        title = title,
+                        visible = controlsVisible,
+                        isPlaying = isPlaying,
+                        position = position,
+                        duration = duration,
+                        seekFocus = seekFocus,
+                        subFocus = subFocus,
+                        audioFocus = audioFocus,
+                        onTogglePlay = { togglePlay() },
+                        onSeek = { seekBy(it) },
+                        onOpenMenu = { kind ->
+                            menuReturnFocus = if (kind == MenuKind.AUDIO) audioFocus else subFocus
+                            menuKind = kind
+                        },
+                    )
+                }
+            }
+
+            // Audio / Subtitles menu — drawn above the controls with a scrim.
+            menuKind?.let { kind ->
+                MenuOverlay(
+                    kind = kind,
+                    selectedIndex = if (kind == MenuKind.AUDIO) selectedAudio else selectedSubtitle,
+                    onSelect = { idx ->
+                        if (kind == MenuKind.AUDIO) selectedAudio = idx else selectedSubtitle = idx
                     },
+                    onDismiss = { menuKind = null },
                 )
             }
-        }
-
-        // Audio / Subtitles menu — drawn above the controls with a scrim.
-        menuKind?.let { kind ->
-            MenuOverlay(
-                kind = kind,
-                selectedIndex = if (kind == MenuKind.AUDIO) selectedAudio else selectedSubtitle,
-                onSelect = { idx ->
-                    if (kind == MenuKind.AUDIO) selectedAudio = idx else selectedSubtitle = idx
-                },
-                onDismiss = { menuKind = null },
-            )
+          }
         }
     }
 }
