@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.net.Uri
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.core.content.res.ResourcesCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.EaseOut
@@ -94,6 +95,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
@@ -108,6 +110,20 @@ private val FocusColor = Color(0xFFFFFFFF)
 // Varela Round, bundled at res/font/varela_round.ttf. Applied to every Text so
 // typography matches the old Flutter/Dart player exactly.
 private val VarelaRound = FontFamily(Font(R.font.varela_round))
+
+private fun PlayerView.applyVarelaRoundSubtitleStyle() {
+    val subtitleTypeface = ResourcesCompat.getFont(context, R.font.varela_round)
+    subtitleView?.setStyle(
+        CaptionStyleCompat(
+            android.graphics.Color.WHITE,
+            android.graphics.Color.TRANSPARENT,
+            android.graphics.Color.TRANSPARENT,
+            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+            android.graphics.Color.BLACK,
+            subtitleTypeface,
+        ),
+    )
+}
 
 private const val SEEK_STEP_MS = 10_000L
 private const val HIDE_DELAY_MS = 4_000L
@@ -583,6 +599,7 @@ private fun PlayerScreen(
                 PlayerView(ctx).apply {
                     useController = false
                     setKeepContentOnPlayerReset(true)
+                    applyVarelaRoundSubtitleStyle()
                     this.player = player
                 }
             },
