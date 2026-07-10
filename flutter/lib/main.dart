@@ -43,11 +43,58 @@ class _AppShell extends StatefulWidget {
   State<_AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<_AppShell> {
+class _AppShellState extends State<_AppShell>
+    with SingleTickerProviderStateMixin {
   api.Media? _selected;
 
-  void _onSelect(api.Media m) => setState(() => _selected = m);
-  void _onBack() => setState(() => _selected = null);
+  // Drives the Details fade: forward = fading in over Home, reverse = fading
+  // out back to Home. Details stays mounted through the whole reverse so the
+  // exit actually animates instead of cutting.
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _ctrl,
+    curve: Curves.easeOut,
+    reverseCurve: Curves.easeIn,
+  );
+
+  // True only once Details has fully faded in — lets us Offstage Home to save
+  // paint work while it's fully covered, but keep it visible during the
+  // cross-fade so you see it through the fading Details.
+  bool _covered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addStatusListener((status) {
+      final covered = status == AnimationStatus.completed;
+      if (covered != _covered) setState(() => _covered = covered);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onSelect(api.Media m) {
+    setState(() => _selected = m);
+    _ctrl.forward(from: 0);
+  }
+
+  void _onBack() {
+    // Fade Details out, then drop it. Home stays put underneath the whole time.
+    // Guard on `dismissed` so a re-open that interrupts the reverse doesn't
+    // then clear the freshly-selected media.
+    _ctrl.reverse().whenComplete(() {
+      if (mounted && _ctrl.status == AnimationStatus.dismissed) {
+        setState(() => _selected = null);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,14 +116,17 @@ class _AppShellState extends State<_AppShell> {
           // (not a conditional) is what stops it from unmounting/refetching;
           // it still lays Home out at full size, so scroll position survives.
           Offstage(
-            offstage: hasDetails,
+            offstage: _covered,
             child: TickerMode(
-              enabled: !hasDetails,
+              enabled: !_covered,
               child: Home(active: !hasDetails, onSelect: _onSelect),
             ),
           ),
           if (hasDetails)
-            Details(media: _selected!, onBack: _onBack),
+            FadeTransition(
+              opacity: _fade,
+              child: Details(media: _selected!, onBack: _onBack),
+            ),
         ],
       ),
     );
