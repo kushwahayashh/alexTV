@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -764,22 +765,32 @@ private fun buildMenuRows(sections: List<MenuSection>): List<MenuRow> {
     return rows
 }
 
+// Fixed ease-in-out tween for menu auto-scroll, matching the browser's smooth
+// scrollIntoView. Compose's default scroll animation is a spring (bouncy,
+// variable speed); a tween gives the steady, React-like glide.
+private val MenuScrollSpec: AnimationSpec<Float> =
+    tween(durationMillis = 320, easing = FastOutSlowInEasing)
+
 // Emulates the web's scrollIntoView(block:'nearest'): scroll the minimum needed
-// to reveal `index` — align to top if it's above the viewport, nudge up if it's
-// below, no-op if already visible.
+// to reveal `index` — a smooth pixel glide up if it's above the viewport, down
+// if it's below, no-op if already visible. Both directions use the same tween
+// (never animateScrollToItem, which snaps/top-aligns and looks jumpy).
 private suspend fun bringNearest(state: LazyListState, index: Int) {
     val info = state.layoutInfo
     val item = info.visibleItemsInfo.firstOrNull { it.index == index }
     if (item == null) {
+        // Off-screen (rare with LEAD navigation): fall back to a smooth scroll.
         state.animateScrollToItem(index)
         return
     }
     val start = info.viewportStartOffset
     val end = info.viewportEndOffset
     if (item.offset < start) {
-        state.animateScrollToItem(index)
+        // Above the viewport → glide up just enough to bring its top to the edge.
+        state.animateScrollBy((item.offset - start).toFloat(), MenuScrollSpec)
     } else if (item.offset + item.size > end) {
-        state.animateScrollBy(((item.offset + item.size) - end).toFloat())
+        // Below the viewport → glide down just enough to bring its bottom in.
+        state.animateScrollBy(((item.offset + item.size) - end).toFloat(), MenuScrollSpec)
     }
 }
 
@@ -816,7 +827,9 @@ private fun MenuOverlay(
     LaunchedEffect(highlight) {
         val lead = 3
         when {
-            highlight <= lead -> listState.animateScrollToItem(0)
+            // Near the top: smooth-glide the first section heading (row 0) to the
+            // top edge. bringNearest keeps the same tween as every other move.
+            highlight <= lead -> bringNearest(listState, 0)
             else -> {
                 val leadTrack = (highlight + dir * lead).coerceIn(0, count - 1)
                 bringNearest(listState, trackToRow[leadTrack])
@@ -862,12 +875,12 @@ private fun MenuOverlay(
                 // max-height: 80vh, matching the React .player-modal.
                 .heightIn(max = maxHeight * 0.8f)
                 .clip(RoundedCornerShape(16.dp))
-                // Translucent white glass, matching the React .player-modal
-                // (rgba(255,255,255,0.22)). Note: React also applies
-                // backdrop-filter: blur(12px); Compose can't backdrop-blur the
-                // video (it's a SurfaceView), so the panel is translucent but
-                // the video behind it stays sharp.
-                .background(Color.White.copy(alpha = 0.22f)),
+                // Solid dark panel on TV. The React .player-modal is translucent
+                // frosted glass (rgba(255,255,255,0.22) + backdrop blur(12px)),
+                // but Compose can't backdrop-blur the video (it's a SurfaceView),
+                // so a translucent panel reads washed out here. Solid keeps text
+                // crisp — the glass look stays in the React player-ui only.
+                .background(Color(0xFF1A1A20)),
             contentPadding = PaddingValues(horizontal = 44.dp, vertical = 36.dp),
             // 10dp base gap mirrors .player-list gap. Section headers carry
             // extra top/bottom padding to reproduce React's three-level spacing:
