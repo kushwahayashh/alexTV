@@ -54,13 +54,13 @@ class _AppShellState extends State<_AppShell> {
     final hasDetails = _selected != null;
     // Single top-level PopScope. Because every PopScope on a route fires on a
     // back press, the child screens' own PopScopes handle Back when they're on
-    // top; this one only guards the Home level so Back there doesn't exit the
-    // app. When Details/Player are shown it stays inert (they handle it).
+    // top. On Home (no Details) we allow the pop so Back exits the app to the
+    // launcher; while Details/Player are shown we block it (they handle Back).
     return PopScope(
-      canPop: false,
+      canPop: !hasDetails,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop || hasDetails) return;
-        // On Home: swallow Back so it doesn't pop the app off the launcher.
+        // Home Back is handled by the system pop (canPop above); nothing to do.
+        // Details/Player handle their own Back via their PopScopes.
       },
       child: Stack(
         fit: StackFit.expand,
