@@ -12,13 +12,25 @@ import {
   useContext,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from 'react'
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
+
+/**
+ * Imperative handle for reading/writing focus from outside the tree (e.g. the
+ * App shell saving the focused card before opening Details and restoring it on
+ * Back). `setFocus` is a no-op if the id isn't currently registered.
+ */
+export type FocusApi = {
+  getFocusId: () => string | null
+  setFocus: (id: string) => void
+}
 
 type FocusableEntry = {
   id: string
@@ -73,6 +85,9 @@ function findNext(
     if (entry.isHeader) continue // header reached only via the explicit Up-from-hero path
     if (!entry.active) continue // skip elements behind a modal overlay
     const to = rectOf(entry.element)
+    // Skip hidden nodes (display:none reports a zero rect) — e.g. the Home
+    // cards sitting mounted-but-hidden behind the Details screen.
+    if (to.width <= 0 && to.height <= 0) continue
 
     const dx = to.cx - from.cx
     const dy = to.cy - from.cy
@@ -103,9 +118,11 @@ function findNext(
 export function FocusProvider({
   children,
   onBack,
+  apiRef,
 }: {
   children: ReactNode
   onBack?: () => void
+  apiRef?: RefObject<FocusApi | null>
 }) {
   const entries = useRef<Map<string, FocusableEntry>>(new Map())
   const [focusId, setFocusId] = useState<string | null>(null)
@@ -127,6 +144,15 @@ export function FocusProvider({
     })
   }, [])
 
+  // Expose an imperative handle so the App shell can snapshot the focused card
+  // before opening Details and restore it on Back. getFocusId reads the live
+  // ref so callers always see the current focus.
+  useImperativeHandle(
+    apiRef,
+    () => ({ getFocusId: () => focusIdRef.current, setFocus }),
+    [setFocus],
+  )
+
   // First focusable in document order — where focus enters when nothing is
   // focused yet (e.g. the user presses Down while the hero is showing).
   const firstInDomOrder = useCallback((): FocusableEntry | null => {
@@ -134,6 +160,9 @@ export function FocusProvider({
     for (const e of entries.current.values()) {
       if (e.isHeader) continue // header isn't part of the content grid
       if (!e.active) continue
+      // Skip hidden nodes (zero rect), e.g. Home cards behind Details.
+      const r = rectOf(e.element)
+      if (r.width <= 0 && r.height <= 0) continue
       if (
         !first ||
         e.element.compareDocumentPosition(first.element) &
@@ -185,6 +214,9 @@ export function FocusProvider({
     for (const id of headerIdsRef.current) {
       const e = entries.current.get(id)
       if (!e) continue
+      // Skip hidden headers (zero rect), e.g. Home's header behind Details.
+      const r = rectOf(e.element)
+      if (r.width <= 0 && r.height <= 0) continue
       if (
         !first ||
         e.element.compareDocumentPosition(first.element) &

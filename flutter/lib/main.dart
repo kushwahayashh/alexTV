@@ -33,7 +33,9 @@ class AlexTvApp extends StatelessWidget {
 }
 
 /// Routes between Home and Details, mirroring the React App.tsx `selected`
-/// state. Pressing Back on Details clears the selection, returning to Home.
+/// state. Home stays mounted (just hidden) while Details is on top, so its
+/// rails data, scroll position and focused card all survive a round-trip —
+/// pressing Back returns to Home instantly without a refetch.
 class _AppShell extends StatefulWidget {
   const _AppShell();
 
@@ -49,10 +51,35 @@ class _AppShellState extends State<_AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final selected = _selected;
-    return selected != null
-        ? Details(media: selected, onBack: _onBack)
-        : Home(onSelect: _onSelect);
+    final hasDetails = _selected != null;
+    // Single top-level PopScope. Because every PopScope on a route fires on a
+    // back press, the child screens' own PopScopes handle Back when they're on
+    // top; this one only guards the Home level so Back there doesn't exit the
+    // app. When Details/Player are shown it stays inert (they handle it).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || hasDetails) return;
+        // On Home: swallow Back so it doesn't pop the app off the launcher.
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Kept mounted underneath Details so its state is preserved. Offstage
+          // (not a conditional) is what stops it from unmounting/refetching;
+          // it still lays Home out at full size, so scroll position survives.
+          Offstage(
+            offstage: hasDetails,
+            child: TickerMode(
+              enabled: !hasDetails,
+              child: Home(active: !hasDetails, onSelect: _onSelect),
+            ),
+          ),
+          if (hasDetails)
+            Details(media: _selected!, onBack: _onBack),
+        ],
+      ),
+    );
   }
 }
 

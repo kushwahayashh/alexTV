@@ -34,8 +34,11 @@ class _DetailsState extends State<Details> {
     _watchLaterId = _focus.register(
       onSelect: () => debugPrint('WATCH LATER ${widget.media.title}'),
     );
-    // Seed focus on the Play button after the first frame.
+    // Seed focus on the Play button after the first frame. Also claim the
+    // keyboard node explicitly — Home stays mounted underneath, so autofocus
+    // alone won't move primary focus here.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _keyboardNode.requestFocus();
       _focus.requestFocus(_playId);
     });
   }
@@ -68,7 +71,12 @@ class _DetailsState extends State<Details> {
       body: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) widget.onBack();
+          // Every PopScope on the route fires on one Back press. While the
+          // Player modal is open it owns Back (closes the modal / steps back a
+          // phase), so Details must stay inert — otherwise a single Back would
+          // both close the modal AND pop Details to Home ("refreshes the app").
+          if (didPop || _showPlayer) return;
+          widget.onBack();
         },
         child: FocusScopeProvider(
           controller: _focus,
