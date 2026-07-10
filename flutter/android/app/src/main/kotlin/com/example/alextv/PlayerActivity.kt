@@ -979,26 +979,34 @@ private fun buildMenuRows(sections: List<MenuSection>): List<MenuRow> {
 private val MenuScrollSpec: AnimationSpec<Float> =
     tween(durationMillis = 320, easing = FastOutSlowInEasing)
 
-// Emulates the web's scrollIntoView(block:'nearest'): scroll the minimum needed
-// to reveal `index` — a smooth pixel glide up if it's above the viewport, down
-// if it's below, no-op if already visible. Both directions use the same tween
-// (never animateScrollToItem, which snaps/top-aligns and looks jumpy).
-private suspend fun bringNearest(state: LazyListState, index: Int) {
+// Emulates the web's scrollIntoView(block:'nearest') "trail" — but driven off the
+// HIGHLIGHT row, which is always laid out, instead of the LEAD row, which usually
+// isn't. Compose's layoutInfo only knows about on-screen rows, so targeting an
+// off-screen lead row forced a top-aligning animateScrollToItem that snapped the
+// list to the end. Here we glide (same MenuScrollSpec tween) only once the
+// highlight runs within `lead` rows of the travel edge; animateScrollBy clamps at
+// the ends, so the top/bottom snap to 0 / scrollHeight falls out for free.
+private suspend fun ensureTrail(state: LazyListState, row: Int, dir: Int, lead: Int) {
     val info = state.layoutInfo
-    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
-    if (item == null) {
-        // Off-screen (rare with LEAD navigation): fall back to a smooth scroll.
-        state.animateScrollToItem(index)
+    val vis = info.visibleItemsInfo
+    // Highlight off-screen (rare — we keep a `lead`-row buffer ahead of it): a
+    // smooth recenter is the safe fallback, and it targets the highlight itself
+    // so it can never yank to the end the way the old lead-row lookup did.
+    val hi = vis.firstOrNull { it.index == row } ?: run {
+        state.animateScrollToItem(row)
         return
     }
-    val start = info.viewportStartOffset
-    val end = info.viewportEndOffset
-    if (item.offset < start) {
-        // Above the viewport → glide up just enough to bring its top to the edge.
-        state.animateScrollBy((item.offset - start).toFloat(), MenuScrollSpec)
-    } else if (item.offset + item.size > end) {
-        // Below the viewport → glide down just enough to bring its bottom in.
-        state.animateScrollBy(((item.offset + item.size) - end).toFloat(), MenuScrollSpec)
+    // Average row pitch (item height + gap) from the visible rows, to size the
+    // margin we want to keep between the highlight and the travel edge.
+    val pitch = if (vis.size >= 2)
+        (vis.last().offset - vis.first().offset).toFloat() / (vis.last().index - vis.first().index)
+    else hi.size.toFloat()
+    val margin = lead * pitch
+    val delta = if (dir < 0) (hi.offset - margin) - info.viewportStartOffset
+    else (hi.offset + hi.size + margin) - info.viewportEndOffset
+    // Only glide in the travel direction, and only once the margin is used up.
+    if ((dir < 0 && delta < 0) || (dir >= 0 && delta > 0)) {
+        state.animateScrollBy(delta, MenuScrollSpec)
     }
 }
 
@@ -1026,24 +1034,13 @@ private fun MenuOverlay(
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
 
-    // Target-scroll: keep a LEAD-row trail behind the highlight by revealing a
-    // row LEAD ahead in the travel direction. Near the top we snap fully to 0 so
-    // the first section heading isn't clipped; near the bottom we DON'T snap —
-    // bringNearest reveals the lead row (which clamps to the last track) with the
-    // minimum scroll, mirroring the web's scrollIntoView(block:'nearest') /
-    // scrollTo(scrollHeight). Snapping to the last item here would top-align it
-    // and yank the list all the way to the end.
+    // Target-scroll: keep a LEAD-row trail behind the highlight. We glide only
+    // once the highlight comes within LEAD rows of the travel edge, driving the
+    // scroll off the highlight's own (always laid-out) row. animateScrollBy
+    // clamps at the ends, so near the top the first section heading glides to the
+    // edge and near the bottom the last row lands without any snap-to-end.
     LaunchedEffect(highlight) {
-        val lead = 3
-        when {
-            // Near the top: smooth-glide the first section heading (row 0) to the
-            // top edge. bringNearest keeps the same tween as every other move.
-            highlight <= lead -> bringNearest(listState, 0)
-            else -> {
-                val leadTrack = (highlight + dir * lead).coerceIn(0, count - 1)
-                bringNearest(listState, trackToRow[leadTrack])
-            }
-        }
+        ensureTrail(listState, trackToRow[highlight], dir, lead = 3)
     }
 
     LaunchedEffect(Unit) { focus.requestFocus() }
