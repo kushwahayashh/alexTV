@@ -12,11 +12,17 @@ const _heroRotateMs = 10000;
 
 class Home extends StatefulWidget {
   final void Function(api.Media) onSelect;
+  final VoidCallback onOpenSearch;
 
   /// False while Details is on top. Home stays mounted (so its data, scroll and
   /// focused card survive) but must not hold keyboard focus or react to keys.
   final bool active;
-  const Home({super.key, required this.onSelect, this.active = true});
+  const Home({
+    super.key,
+    required this.onSelect,
+    required this.onOpenSearch,
+    this.active = true,
+  });
 
   @override
   State<Home> createState() => _HomeState();
@@ -158,7 +164,11 @@ class _HomeState extends State<Home> {
                       children: [
                         HeaderButton(label: 'Home', onFocused: _releaseToTop),
                         const SizedBox(width: 12),
-                        HeaderButton(label: 'Search', onFocused: _releaseToTop),
+                        HeaderButton(
+                          label: 'Search',
+                          onFocused: _releaseToTop,
+                          onSelect: widget.onOpenSearch,
+                        ),
                         const SizedBox(width: 12),
                         HeaderButton(
                           label: 'Library',

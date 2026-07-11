@@ -15,9 +15,18 @@ class _Entry {
   final int id;
   final GlobalKey key;
   final VoidCallback? onSelect;
-  final VoidCallback? onFocused; // scrolls itself into view, like scrollIntoView
+  final VoidCallback?
+  onFocused; // scrolls itself into view, like scrollIntoView
   final bool isHeader; // top bar (e.g. Update button), reached by Up from hero
-  _Entry(this.id, this.key, this.onSelect, this.onFocused, this.isHeader);
+  final bool isInput;
+  _Entry(
+    this.id,
+    this.key,
+    this.onSelect,
+    this.onFocused,
+    this.isHeader,
+    this.isInput,
+  );
 
   Rect? get rect {
     final ctx = key.currentContext;
@@ -42,9 +51,17 @@ class FocusController extends ChangeNotifier {
     VoidCallback? onSelect,
     VoidCallback? onFocused,
     bool isHeader = false,
+    bool isInput = false,
   }) {
     final id = _counter++;
-    _entries[id] = _Entry(id, GlobalKey(), onSelect, onFocused, isHeader);
+    _entries[id] = _Entry(
+      id,
+      GlobalKey(),
+      onSelect,
+      onFocused,
+      isHeader,
+      isInput,
+    );
     if (isHeader) _headerIds.add(id);
     return id;
   }
@@ -148,7 +165,9 @@ class FocusController extends ChangeNotifier {
 
     for (final e in _entries.values) {
       if (e.id == currentId) continue;
-      if (e.isHeader) continue; // reached only via the explicit Up-from-top path
+      if (e.isHeader) {
+        continue; // reached only via the explicit Up-from-top path
+      }
       final to = e.rect;
       if (to == null) continue;
       final tc = to.center;
@@ -179,8 +198,11 @@ class FocusController extends ChangeNotifier {
   }
 
   /// Handle a raw key event at the app root. Returns true if consumed.
-  KeyEventResult handleKey(KeyEvent event, VoidCallback? onBack,
-      VoidCallback? onReleaseTop) {
+  KeyEventResult handleKey(
+    KeyEvent event,
+    VoidCallback? onBack,
+    VoidCallback? onReleaseTop,
+  ) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
@@ -194,6 +216,22 @@ class FocusController extends ChangeNotifier {
     };
     if (dir != null) {
       final cur = _focusId;
+      final curEntry = cur == null ? null : _entries[cur];
+
+      if (curEntry?.isInput == true) {
+        if (dir == Direction.left || dir == Direction.right) {
+          return KeyEventResult.ignored;
+        }
+        if (dir == Direction.up) {
+          final first = _firstHeader();
+          if (first != null) _setFocus(first);
+        } else {
+          final next = _findNext(cur!, Direction.down);
+          if (next != null) _setFocus(next);
+        }
+        return KeyEventResult.handled;
+      }
+
       // Header focused: left/right moves between headers, down drops to hero.
       if (cur != null && _headerIds.contains(cur)) {
         if (dir == Direction.down) {
@@ -232,13 +270,24 @@ class FocusController extends ChangeNotifier {
         event.logicalKey == LogicalKeyboardKey.space ||
         event.logicalKey == LogicalKeyboardKey.select) {
       final cur = _focusId;
-      if (cur != null) _entries[cur]?.onSelect?.call();
+      final curEntry = cur == null ? null : _entries[cur];
+      if (curEntry?.isInput == true &&
+          event.logicalKey == LogicalKeyboardKey.space) {
+        return KeyEventResult.ignored;
+      }
+      if (curEntry != null) curEntry.onSelect?.call();
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.escape ||
         event.logicalKey == LogicalKeyboardKey.backspace ||
         event.logicalKey == LogicalKeyboardKey.goBack) {
+      final cur = _focusId;
+      final curEntry = cur == null ? null : _entries[cur];
+      if (curEntry?.isInput == true &&
+          event.logicalKey == LogicalKeyboardKey.backspace) {
+        return KeyEventResult.ignored;
+      }
       onBack?.call();
       return KeyEventResult.handled;
     }
@@ -256,8 +305,8 @@ class FocusScopeProvider extends InheritedNotifier<FocusController> {
   }) : super(notifier: controller);
 
   static FocusController of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<FocusScopeProvider>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<FocusScopeProvider>();
     assert(scope != null, 'No FocusScopeProvider found in context');
     return scope!.notifier!;
   }
@@ -265,9 +314,11 @@ class FocusScopeProvider extends InheritedNotifier<FocusController> {
   /// Non-subscribing lookup — use in initState/didChangeDependencies for
   /// one-time registration where you don't want to rebuild on focus changes.
   static FocusController read(BuildContext context) {
-    final scope = context
-        .getElementForInheritedWidgetOfExactType<FocusScopeProvider>()!
-        .widget as FocusScopeProvider;
+    final scope =
+        context
+                .getElementForInheritedWidgetOfExactType<FocusScopeProvider>()!
+                .widget
+            as FocusScopeProvider;
     return scope.notifier!;
   }
 }

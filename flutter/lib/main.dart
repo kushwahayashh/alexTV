@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'api/tmdb.dart' as api;
 import 'screens/home.dart';
+import 'screens/search.dart';
 import 'screens/details.dart';
 import 'theme.dart';
 
@@ -46,6 +47,7 @@ class _AppShell extends StatefulWidget {
 class _AppShellState extends State<_AppShell>
     with SingleTickerProviderStateMixin {
   api.Media? _selected;
+  bool _showSearch = false;
 
   // Drives the Details fade: forward = fading in over Home, reverse = fading
   // out back to Home. Details stays mounted through the whole reverse so the
@@ -85,6 +87,10 @@ class _AppShellState extends State<_AppShell>
     _ctrl.forward(from: 0);
   }
 
+  void _openSearch() => setState(() => _showSearch = true);
+
+  void _closeSearch() => setState(() => _showSearch = false);
+
   void _onBack() {
     // Fade Details out, then drop it. Home stays put underneath the whole time.
     // Guard on `dismissed` so a re-open that interrupts the reverse doesn't
@@ -99,29 +105,46 @@ class _AppShellState extends State<_AppShell>
   @override
   Widget build(BuildContext context) {
     final hasDetails = _selected != null;
+    final homeCovered = _covered || (_showSearch && !hasDetails);
     // Single top-level PopScope. Because every PopScope on a route fires on a
     // back press, the child screens' own PopScopes handle Back when they're on
-    // top. On Home (no Details) we allow the pop so Back exits the app to the
-    // launcher; while Details/Player are shown we block it (they handle Back).
+    // top. On Home (no overlay) we allow the pop so Back exits the app to the
+    // launcher; while Search/Details/Player are shown we block it.
     return PopScope(
-      canPop: !hasDetails,
+      canPop: !hasDetails && !_showSearch,
       onPopInvokedWithResult: (didPop, _) {
-        // Home Back is handled by the system pop (canPop above); nothing to do.
-        // Details/Player handle their own Back via their PopScopes.
+        if (didPop || hasDetails) return;
+        if (_showSearch) _closeSearch();
       },
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Kept mounted underneath Details so its state is preserved. Offstage
+          // Kept mounted underneath overlays so its state is preserved. Offstage
           // (not a conditional) is what stops it from unmounting/refetching;
           // it still lays Home out at full size, so scroll position survives.
           Offstage(
-            offstage: _covered,
+            offstage: homeCovered,
             child: TickerMode(
-              enabled: !_covered,
-              child: Home(active: !hasDetails, onSelect: _onSelect),
+              enabled: !homeCovered,
+              child: Home(
+                active: !hasDetails && !_showSearch,
+                onSelect: _onSelect,
+                onOpenSearch: _openSearch,
+              ),
             ),
           ),
+          if (_showSearch)
+            Offstage(
+              offstage: hasDetails,
+              child: TickerMode(
+                enabled: !hasDetails,
+                child: Search(
+                  active: !hasDetails,
+                  onSelect: _onSelect,
+                  onGoHome: _closeSearch,
+                ),
+              ),
+            ),
           if (hasDetails)
             FadeTransition(
               opacity: _fade,

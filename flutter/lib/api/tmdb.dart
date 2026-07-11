@@ -40,9 +40,12 @@ class Media {
   });
 
   factory Media.fromJson(Map<String, dynamic> item, String fallbackType) {
-    final date = (item['release_date'] ?? item['first_air_date'] ?? '') as String;
+    final date =
+        (item['release_date'] ?? item['first_air_date'] ?? '') as String;
     final rawType = item['media_type'];
-    final type = (rawType == 'tv' || rawType == 'movie') ? rawType : fallbackType;
+    final type = (rawType == 'tv' || rawType == 'movie')
+        ? rawType
+        : fallbackType;
     final vote = (item['vote_average'] as num?)?.toDouble() ?? 0;
     return Media(
       id: item['id'] as int,
@@ -66,13 +69,32 @@ class Rail {
 Future<List<Map<String, dynamic>>> _get(String path) async {
   final sep = path.contains('?') ? '&' : '?';
   final targetUrl = '$_base$path${sep}api_key=$_apiKey';
-  final res = await http.get(Uri.parse('$_proxy${Uri.encodeComponent(targetUrl)}'));
+  final res = await http.get(
+    Uri.parse('$_proxy${Uri.encodeComponent(targetUrl)}'),
+  );
   if (res.statusCode != 200) {
     throw Exception('TMDB ${res.statusCode} on $path');
   }
   final json = jsonDecode(res.body) as Map<String, dynamic>;
   final results = (json['results'] as List?) ?? const [];
   return results.cast<Map<String, dynamic>>();
+}
+
+Future<List<Media>> searchMulti(String query) async {
+  final q = query.trim();
+  if (q.isEmpty) return const [];
+
+  final items = await _get(
+    '/search/multi?query=${Uri.encodeComponent(q)}&include_adult=false',
+  );
+  return items
+      .where(
+        (i) =>
+            (i['media_type'] == 'movie' || i['media_type'] == 'tv') &&
+            i['poster_path'] != null,
+      )
+      .map((i) => Media.fromJson(i, 'movie'))
+      .toList();
 }
 
 Future<List<Rail>> fetchHomeRails() async {
