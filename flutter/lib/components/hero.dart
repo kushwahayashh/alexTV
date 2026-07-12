@@ -137,7 +137,11 @@ class _HeroContent extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: AppColors.text,
             shadows: [
-              Shadow(color: Color(0x99000000), blurRadius: 18, offset: Offset(0, 2)),
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 18,
+                offset: Offset(0, 2),
+              ),
             ],
           ),
         ),
@@ -159,7 +163,9 @@ class _HeroContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              Text('★ ${media.rating == 0 ? '—' : media.rating}'),
+              const Icon(Icons.check, size: 16, color: AppColors.muted),
+              const SizedBox(width: 4),
+              Text('${media.rating == 0 ? '—' : media.rating}'),
             ],
           ),
         ),

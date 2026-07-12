@@ -3,7 +3,7 @@ import 'package:flutter/rendering.dart';
 import '../api/series.dart';
 import '../api/stream.dart' as stream;
 import '../api/tmdb.dart';
-import '../components/hero.dart' show FadeIn, Scrim;
+import '../components/hero.dart' show FadeIn;
 import '../components/fade_image.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
@@ -208,13 +208,12 @@ class _DetailsState extends State<Details> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                SingleChildScrollView(
+                CustomScrollView(
                   controller: _pageController,
                   physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _DetailsHero(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _DetailsHero(
                         media: media,
                         isTv: _isTv,
                         seasons: _seasons,
@@ -222,25 +221,25 @@ class _DetailsState extends State<Details> {
                         playId: _playId,
                         watchLaterId: _watchLaterId,
                       ),
-                      if (_isTv)
-                        _SeriesSection(
-                          seasons: _seasons,
-                          activeIdx: _activeIdx,
-                          episodes: _episodes,
-                          error: _seriesError,
-                          playerOpen: _playerOpen,
-                          pageController: _pageController,
-                          onSeason: (index) {
-                            setState(() {
-                              _activeIdx = index;
-                              _episodes = null;
-                            });
-                            _loadActiveSeason();
-                          },
-                          onEpisode: _openEpisode,
-                        ),
-                    ],
-                  ),
+                    ),
+                    if (_isTv)
+                      ..._seriesSlivers(
+                        seasons: _seasons,
+                        activeIdx: _activeIdx,
+                        episodes: _episodes,
+                        error: _seriesError,
+                        playerOpen: _playerOpen,
+                        pageController: _pageController,
+                        onSeason: (index) {
+                          setState(() {
+                            _activeIdx = index;
+                            _episodes = null;
+                          });
+                          _loadActiveSeason();
+                        },
+                        onEpisode: _openEpisode,
+                      ),
+                  ],
                 ),
                 if (_showPlayer)
                   Player(media: media, onClose: _closeMoviePlayer),
@@ -292,7 +291,7 @@ class _DetailsHero extends StatelessWidget {
               src: Img.backdrop(media.backdropPath),
               alignment: const Alignment(0, -0.64),
             ),
-          const Scrim(),
+          const _DetailsScrim(),
           Positioned(
             left: AppSizes.pagePadding,
             bottom: 20,
@@ -310,6 +309,48 @@ class _DetailsHero extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DetailsScrim extends StatelessWidget {
+  const _DetailsScrim();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                AppColors.bg.withValues(alpha: 0.95),
+                AppColors.bg.withValues(alpha: 0.40),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.55, 1.0],
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                AppColors.bg,
+                AppColors.bg.withValues(alpha: 0.85),
+                AppColors.bg.withValues(alpha: 0.35),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.12, 0.30, 0.55],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -372,7 +413,9 @@ class _DetailsContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              Text('✔ ${media.rating == 0 ? '—' : media.rating}'),
+              const Icon(Icons.check, size: 16, color: AppColors.muted),
+              const SizedBox(width: 4),
+              Text('${media.rating == 0 ? '—' : media.rating}'),
               if (isTv &&
                   seasons != null &&
                   flatEpisodes == null &&
@@ -401,13 +444,15 @@ class _DetailsContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _DetailsButton(
-              label: '▶ Play',
+              icon: Icons.play_arrow,
+              label: 'Play',
               id: playId,
               focused: controller.isFocused(playId),
             ),
             const SizedBox(width: 14),
             _DetailsButton(
-              label: '+ Watch Later',
+              icon: Icons.add,
+              label: 'Watch Later',
               id: watchLaterId,
               focused: controller.isFocused(watchLaterId),
             ),
@@ -418,124 +463,185 @@ class _DetailsContent extends StatelessWidget {
   }
 }
 
-class _SeriesSection extends StatelessWidget {
-  final List<SeasonOption>? seasons;
-  final int activeIdx;
-  final List<stream.VideoFile>? episodes;
-  final String? error;
-  final bool playerOpen;
-  final ScrollController pageController;
-  final ValueChanged<int> onSeason;
-  final void Function(stream.VideoFile episode, int index) onEpisode;
-
-  const _SeriesSection({
-    required this.seasons,
-    required this.activeIdx,
-    required this.episodes,
-    required this.error,
-    required this.playerOpen,
-    required this.pageController,
-    required this.onSeason,
-    required this.onEpisode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
+List<Widget> _seriesSlivers({
+  required List<SeasonOption>? seasons,
+  required int activeIdx,
+  required List<stream.VideoFile>? episodes,
+  required String? error,
+  required bool playerOpen,
+  required ScrollController pageController,
+  required ValueChanged<int> onSeason,
+  required void Function(stream.VideoFile episode, int index) onEpisode,
+}) {
+  return [
+    SliverPersistentHeader(
+      pinned: true,
+      delegate: _SeriesBarDelegate(
+        seasons: seasons,
+        activeIdx: activeIdx,
+        playerOpen: playerOpen,
+        onSeason: onSeason,
+      ),
+    ),
+    SliverPadding(
       padding: const EdgeInsets.fromLTRB(
         AppSizes.pagePadding,
-        0,
+        6,
         AppSizes.pagePadding,
         72,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      sliver: _seriesListSliver(
+        episodes: episodes,
+        error: error,
+        playerOpen: playerOpen,
+        pageController: pageController,
+        onEpisode: onEpisode,
+      ),
+    ),
+  ];
+}
+
+Widget _seriesListSliver({
+  required List<stream.VideoFile>? episodes,
+  required String? error,
+  required bool playerOpen,
+  required ScrollController pageController,
+  required void Function(stream.VideoFile episode, int index) onEpisode,
+}) {
+  if (error != null) {
+    return const SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 4),
+        child: Text(
+          "This series isn't available to stream right now.",
+          style: TextStyle(color: AppColors.muted, fontSize: 16.8),
+        ),
+      ),
+    );
+  }
+
+  if (episodes == null) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => Padding(
+          padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
+          child: const _EpisodeSkeleton(),
+        ),
+        childCount: 5,
+      ),
+    );
+  }
+
+  if (episodes.isEmpty) {
+    return const SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 4),
+        child: Text(
+          'No episodes found for this season.',
+          style: TextStyle(color: AppColors.muted, fontSize: 16.8),
+        ),
+      ),
+    );
+  }
+
+  return SliverList(
+    delegate: SliverChildBuilderDelegate(
+      (context, index) => Padding(
+        padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
+        child: _EpisodeRow(
+          num: episodes[index].episode ?? index + 1,
+          title: epTitle(episodes[index], episodes[index].episode ?? index + 1),
+          fileName: episodes[index].fileName,
+          resLabel: episodes[index].resLabel,
+          enabled: !playerOpen,
+          pageController: pageController,
+          onSelect: () => onEpisode(episodes[index], index),
+        ),
+      ),
+      childCount: episodes.length,
+    ),
+  );
+}
+
+class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
+  final List<SeasonOption>? seasons;
+  final int activeIdx;
+  final bool playerOpen;
+  final ValueChanged<int> onSeason;
+
+  const _SeriesBarDelegate({
+    required this.seasons,
+    required this.activeIdx,
+    required this.playerOpen,
+    required this.onSeason,
+  });
+
+  @override
+  double get minExtent => 82;
+
+  @override
+  double get maxExtent => 82;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: AppColors.bg,
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.pagePadding,
+        18,
+        AppSizes.pagePadding,
+        16,
+      ),
+      child: Row(
         children: [
-          Container(
-            color: AppColors.bg,
-            padding: const EdgeInsets.only(top: 18, bottom: 16),
-            child: Row(
-              children: [
-                const Text(
-                  'Episodes',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 21.6,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: 28),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const ClampingScrollPhysics(),
-                    clipBehavior: Clip.none,
-                    child: Row(
-                      children: seasons == null
-                          ? [
-                              for (int i = 0; i < 3; i++)
-                                const _SeasonSkeleton(),
-                            ]
-                          : [
-                              for (int i = 0; i < seasons!.length; i++)
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    right: i == seasons!.length - 1 ? 0 : 12,
-                                  ),
-                                  child: _SeasonTab(
-                                    label: seasons![i].label,
-                                    active: i == activeIdx,
-                                    enabled: !playerOpen,
-                                    onSelect: () => onSeason(i),
-                                  ),
-                                ),
-                            ],
-                    ),
-                  ),
-                ),
-              ],
+          const Text(
+            'Episodes',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 21.6,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
-          if (error != null)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24, horizontal: 4),
-              child: Text(
-                "This series isn't available to stream right now.",
-                style: TextStyle(color: AppColors.muted, fontSize: 16.8),
+          const SizedBox(width: 28),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              clipBehavior: Clip.none,
+              child: Row(
+                children: seasons == null
+                    ? [for (int i = 0; i < 3; i++) const _SeasonSkeleton()]
+                    : [
+                        for (int i = 0; i < seasons!.length; i++)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              right: i == seasons!.length - 1 ? 0 : 12,
+                            ),
+                            child: _SeasonTab(
+                              label: seasons![i].label,
+                              active: i == activeIdx,
+                              enabled: !playerOpen,
+                              onSelect: () => onSeason(i),
+                            ),
+                          ),
+                      ],
               ),
-            )
-          else if (episodes == null)
-            for (int i = 0; i < 5; i++)
-              Padding(
-                padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
-                child: const _EpisodeSkeleton(),
-              )
-          else if (episodes!.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24, horizontal: 4),
-              child: Text(
-                'No episodes found for this season.',
-                style: TextStyle(color: AppColors.muted, fontSize: 16.8),
-              ),
-            )
-          else
-            for (int i = 0; i < episodes!.length; i++)
-              Padding(
-                padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
-                child: _EpisodeRow(
-                  num: episodes![i].episode ?? i + 1,
-                  title: epTitle(episodes![i], episodes![i].episode ?? i + 1),
-                  fileName: episodes![i].fileName,
-                  resLabel: episodes![i].resLabel,
-                  enabled: !playerOpen,
-                  pageController: pageController,
-                  onSelect: () => onEpisode(episodes![i], i),
-                ),
-              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SeriesBarDelegate oldDelegate) {
+    return seasons != oldDelegate.seasons ||
+        activeIdx != oldDelegate.activeIdx ||
+        playerOpen != oldDelegate.playerOpen;
   }
 }
 
@@ -790,11 +896,13 @@ class _EpisodeRowState extends State<_EpisodeRow> {
 }
 
 class _DetailsButton extends StatelessWidget {
+  final IconData icon;
   final String label;
   final int id;
   final bool focused;
 
   const _DetailsButton({
+    required this.icon,
     required this.label,
     required this.id,
     required this.focused,
@@ -815,13 +923,24 @@ class _DetailsButton extends StatelessWidget {
               : Colors.white.withValues(alpha: 0.22),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: focused ? AppColors.bg : AppColors.text,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: focused ? AppColors.bg : AppColors.text,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: focused ? AppColors.bg : AppColors.text,
+              ),
+            ),
+          ],
         ),
       ),
     );
