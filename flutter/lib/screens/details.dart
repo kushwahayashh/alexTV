@@ -413,9 +413,7 @@ class _DetailsContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              const Icon(Icons.check, size: 16, color: AppColors.muted),
-              const SizedBox(width: 4),
-              Text('${media.rating == 0 ? '—' : media.rating}'),
+              Text('✔ ${media.rating == 0 ? '—' : media.rating}'),
               if (isTv &&
                   seasons != null &&
                   flatEpisodes == null &&
@@ -608,28 +606,53 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
           ),
           const SizedBox(width: 28),
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              clipBehavior: Clip.none,
-              child: Row(
-                children: seasons == null
-                    ? [for (int i = 0; i < 3; i++) const _SeasonSkeleton()]
-                    : [
-                        for (int i = 0; i < seasons!.length; i++)
-                          Padding(
-                            padding: EdgeInsets.only(
-                              right: i == seasons!.length - 1 ? 0 : 12,
-                            ),
-                            child: _SeasonTab(
-                              label: seasons![i].label,
-                              active: i == activeIdx,
-                              enabled: !playerOpen,
-                              onSelect: () => onSeason(i),
-                            ),
-                          ),
-                      ],
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth <= 0
+                    ? 1.0
+                    : constraints.maxWidth;
+                final fadeStop = (28.0 / width).clamp(0.0, 0.5).toDouble();
+                return ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: const [
+                      Colors.transparent,
+                      Colors.white,
+                      Colors.white,
+                      Colors.transparent,
+                    ],
+                    stops: [0, fadeStop, 1 - fadeStop, 1],
+                  ).createShader(bounds),
+                  blendMode: BlendMode.dstIn,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const ClampingScrollPhysics(),
+                    clipBehavior: Clip.none,
+                    child: Row(
+                      children: seasons == null
+                          ? [
+                              for (int i = 0; i < 3; i++)
+                                const _SeasonSkeleton(),
+                            ]
+                          : [
+                              for (int i = 0; i < seasons!.length; i++)
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    right: i == seasons!.length - 1 ? 0 : 12,
+                                  ),
+                                  child: _SeasonTab(
+                                    label: seasons![i].label,
+                                    active: i == activeIdx,
+                                    enabled: !playerOpen,
+                                    onSelect: () => onSeason(i),
+                                  ),
+                                ),
+                            ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
