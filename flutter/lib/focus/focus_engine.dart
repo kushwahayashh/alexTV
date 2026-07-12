@@ -285,6 +285,10 @@ class FocusController extends ChangeNotifier {
       return KeyEventResult.handled;
     }
 
+    if (event is KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.space ||
         event.logicalKey == LogicalKeyboardKey.select) {

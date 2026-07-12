@@ -48,6 +48,8 @@ class _AppShellState extends State<_AppShell>
     with SingleTickerProviderStateMixin {
   api.Media? _selected;
   bool _showSearch = false;
+  bool _detailsClosing = false;
+  bool _detailsPlayerOpen = false;
 
   // Drives the Details fade: forward = fading in over Home, reverse = fading
   // out back to Home. Details stays mounted through the whole reverse so the
@@ -83,7 +85,11 @@ class _AppShellState extends State<_AppShell>
   }
 
   void _onSelect(api.Media m) {
-    setState(() => _selected = m);
+    setState(() {
+      _selected = m;
+      _detailsClosing = false;
+      _detailsPlayerOpen = false;
+    });
     _ctrl.forward(from: 0);
   }
 
@@ -92,12 +98,18 @@ class _AppShellState extends State<_AppShell>
   void _closeSearch() => setState(() => _showSearch = false);
 
   void _onBack() {
+    if (_detailsClosing || _detailsPlayerOpen) return;
+    setState(() => _detailsClosing = true);
     // Fade Details out, then drop it. Home stays put underneath the whole time.
     // Guard on `dismissed` so a re-open that interrupts the reverse doesn't
     // then clear the freshly-selected media.
     _ctrl.reverse().whenComplete(() {
       if (mounted && _ctrl.status == AnimationStatus.dismissed) {
-        setState(() => _selected = null);
+        setState(() {
+          _selected = null;
+          _detailsClosing = false;
+          _detailsPlayerOpen = false;
+        });
       }
     });
   }
@@ -113,7 +125,11 @@ class _AppShellState extends State<_AppShell>
     return PopScope(
       canPop: !hasDetails && !_showSearch,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop || hasDetails) return;
+        if (didPop) return;
+        if (hasDetails) {
+          if (!_detailsPlayerOpen) _onBack();
+          return;
+        }
         if (_showSearch) _closeSearch();
       },
       child: Stack(
@@ -148,7 +164,15 @@ class _AppShellState extends State<_AppShell>
           if (hasDetails)
             FadeTransition(
               opacity: _fade,
-              child: Details(media: _selected!, onBack: _onBack),
+              child: Details(
+                media: _selected!,
+                onBack: _onBack,
+                onPlayerOpenChanged: (open) {
+                  if (mounted && open != _detailsPlayerOpen) {
+                    setState(() => _detailsPlayerOpen = open);
+                  }
+                },
+              ),
             ),
         ],
       ),

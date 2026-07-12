@@ -568,9 +568,15 @@ private fun PlayerScreen(
         }
     }
 
-    BackHandler { if (menuKind != null) menuKind = null else onClose() }
-
     fun bump() { activityTick++ }
+
+    fun dismissMenu() {
+        bump()
+        controlsVisible = true
+        menuKind = null
+    }
+
+    BackHandler { if (menuKind != null) dismissMenu() else onClose() }
 
     fun togglePlay() {
         if (player.isPlaying) player.pause() else player.play()
@@ -673,7 +679,7 @@ private fun PlayerScreen(
                                         .build()
                             }
                         },
-                        onDismiss = { menuKind = null },
+                        onDismiss = { dismissMenu() },
                     )
                 } else {
                     // Subtitles menu. ORG subs = embedded text tracks (with a
@@ -735,7 +741,7 @@ private fun PlayerScreen(
                                 else -> Unit
                             }
                         },
-                        onDismiss = { menuKind = null },
+                        onDismiss = { dismissMenu() },
                     )
                 }
             }

@@ -12,8 +12,14 @@ import '../theme.dart';
 class Details extends StatefulWidget {
   final Media media;
   final VoidCallback onBack;
+  final ValueChanged<bool>? onPlayerOpenChanged;
 
-  const Details({super.key, required this.media, required this.onBack});
+  const Details({
+    super.key,
+    required this.media,
+    required this.onBack,
+    this.onPlayerOpenChanged,
+  });
 
   @override
   State<Details> createState() => _DetailsState();
@@ -45,6 +51,23 @@ class _DetailsState extends State<Details> {
 
   bool get _isTv => widget.media.mediaType == 'tv';
   bool get _playerOpen => _showPlayer || _episodePlay != null;
+
+  void _setPlayerOpen({bool? movie, _EpisodePlay? episode}) {
+    final wasOpen = _playerOpen;
+    setState(() {
+      if (movie != null) _showPlayer = movie;
+      if (episode != null) _episodePlay = episode;
+    });
+    final open = _playerOpen;
+    if (open != wasOpen) widget.onPlayerOpenChanged?.call(open);
+  }
+
+  void _clearEpisodePlayer() {
+    final wasOpen = _playerOpen;
+    setState(() => _episodePlay = null);
+    final open = _playerOpen;
+    if (open != wasOpen) widget.onPlayerOpenChanged?.call(open);
+  }
 
   @override
   void initState() {
@@ -150,7 +173,7 @@ class _DetailsState extends State<Details> {
 
   void _openPlayer() {
     if (!_isTv) {
-      setState(() => _showPlayer = true);
+      _setPlayerOpen(movie: true);
       return;
     }
     final episodes = _episodes;
@@ -161,21 +184,21 @@ class _DetailsState extends State<Details> {
 
   void _openEpisode(stream.VideoFile episode, int index) {
     final num = episode.episode ?? index + 1;
-    setState(() {
-      _episodePlay = _EpisodePlay(
+    _setPlayerOpen(
+      episode: _EpisodePlay(
         fid: episode.fid,
         label: '${widget.media.title} · ${epTitle(episode, num)}',
-      );
-    });
+      ),
+    );
   }
 
   void _closeMoviePlayer() {
-    setState(() => _showPlayer = false);
+    _setPlayerOpen(movie: false);
     _restoreDetailsFocus();
   }
 
   void _closeEpisodePlayer() {
-    setState(() => _episodePlay = null);
+    _clearEpisodePlayer();
     _restoreDetailsFocus();
   }
 
@@ -203,8 +226,9 @@ class _DetailsState extends State<Details> {
           child: Focus(
             focusNode: _keyboardNode,
             autofocus: true,
-            onKeyEvent: (_, event) =>
-                _focus.handleKey(event, widget.onBack, null),
+            onKeyEvent: (_, event) => _playerOpen
+                ? KeyEventResult.ignored
+                : _focus.handleKey(event, widget.onBack, null),
             child: Stack(
               fit: StackFit.expand,
               children: [
