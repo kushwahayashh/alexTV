@@ -24,9 +24,17 @@ const _playerChannel = MethodChannel('com.example.alextv/player');
 /// navigates within the player (links→files) or closes it.
 class Player extends StatefulWidget {
   final Media media;
+  final int? startFid;
+  final String? title;
   final VoidCallback onClose;
 
-  const Player({super.key, required this.media, required this.onClose});
+  const Player({
+    super.key,
+    required this.media,
+    this.startFid,
+    this.title,
+    required this.onClose,
+  });
 
   @override
   State<Player> createState() => _PlayerState();
@@ -52,6 +60,12 @@ class _PlayerState extends State<Player> {
   }
 
   Future<void> _resolve() async {
+    final startFid = widget.startFid;
+    if (startFid != null) {
+      await _loadLinks(startFid, episode: true);
+      return;
+    }
+
     try {
       final files = await resolveMovie(widget.media.title, widget.media.year);
       if (!mounted) return;
@@ -69,28 +83,20 @@ class _PlayerState extends State<Player> {
     }
   }
 
-  void _handleBack() {
-    if (_phase == _Phase.links) {
-      setState(() => _phase = _Phase.files);
-    } else {
-      widget.onClose();
-    }
-  }
-
-  void _pickFile(VideoFile file) async {
-    setState(() => _phase = _Phase.loading);
+  Future<void> _loadLinks(int fid, {required bool episode}) async {
     try {
-      // Fetch stream links and FebBox web subtitles during this loading step, so
-      // launching the player is instant. Subs are optional — a failure there
-      // must not block playback, so fall back to none.
-      final links = await getLinks(file.fid);
-      final subs = await getWebSubs(file.fid).catchError((_) => <WebSub>[]);
+      final links = await getLinks(fid);
+      final subs = await getWebSubs(fid).catchError((_) => <WebSub>[]);
       if (!mounted) return;
       setState(() {
         _links = links;
         _webSubs = subs;
         _phase = links.isNotEmpty ? _Phase.links : _Phase.error;
-        if (links.isEmpty) _error = 'No stream links for this file.';
+        if (links.isEmpty) {
+          _error = episode
+              ? 'No stream links for this episode.'
+              : 'No stream links for this file.';
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -101,6 +107,19 @@ class _PlayerState extends State<Player> {
     }
   }
 
+  void _handleBack() {
+    if (_phase == _Phase.links && widget.startFid == null) {
+      setState(() => _phase = _Phase.files);
+    } else {
+      widget.onClose();
+    }
+  }
+
+  void _pickFile(VideoFile file) async {
+    setState(() => _phase = _Phase.loading);
+    await _loadLinks(file.fid, episode: false);
+  }
+
   void _pickLink(StreamLink link) async {
     // Launch the native full-screen ExoPlayer. Playback happens in its own
     // Activity; the Flutter modal stays mounted underneath and is revealed
@@ -109,7 +128,7 @@ class _PlayerState extends State<Player> {
       await _playerChannel.invokeMethod('play', {
         'url': link.url,
         'ext': link.ext,
-        'title': widget.media.title,
+        'title': widget.title ?? widget.media.title,
         // Web (FebBox) subtitles for the picked file, attached natively.
         'subLabels': _webSubs.map((s) => s.label).toList(),
         'subUrls': _webSubs.map((s) => s.url).toList(),

@@ -19,6 +19,7 @@ class _Entry {
   onFocused; // scrolls itself into view, like scrollIntoView
   final bool isHeader; // top bar (e.g. Update button), reached by Up from hero
   final bool isInput;
+  bool active;
   _Entry(
     this.id,
     this.key,
@@ -26,6 +27,7 @@ class _Entry {
     this.onFocused,
     this.isHeader,
     this.isInput,
+    this.active,
   );
 
   Rect? get rect {
@@ -52,6 +54,7 @@ class FocusController extends ChangeNotifier {
     VoidCallback? onFocused,
     bool isHeader = false,
     bool isInput = false,
+    bool active = true,
   }) {
     final id = _counter++;
     _entries[id] = _Entry(
@@ -61,19 +64,30 @@ class FocusController extends ChangeNotifier {
       onFocused,
       isHeader,
       isInput,
+      active,
     );
     if (isHeader) _headerIds.add(id);
     return id;
   }
 
   GlobalKey keyOf(int id) => _entries[id]!.key;
+
+  void setActive(int id, bool active) {
+    final entry = _entries[id];
+    if (entry == null || entry.active == active) return;
+    entry.active = active;
+    if (!active && _focusId == id) _focusId = null;
+    notifyListeners();
+  }
+
   void unregister(int id) {
     _entries.remove(id);
     _headerIds.remove(id);
   }
 
   void _setFocus(int id) {
-    if (!_entries.containsKey(id)) return;
+    final entry = _entries[id];
+    if (entry == null || !entry.active) return;
     _focusId = id;
     notifyListeners();
     // Defer so the newly-focused widget has laid out before it scrolls itself in.
@@ -99,8 +113,9 @@ class FocusController extends ChangeNotifier {
     Rect? bestR;
     for (final e in _entries.values) {
       if (e.isHeader) continue; // header isn't part of the content grid
+      if (!e.active) continue;
       final r = e.rect;
-      if (r == null) continue;
+      if (r == null || r.isEmpty) continue;
       if (bestR == null ||
           r.top < bestR.top - 1 ||
           (r.top < bestR.top + 1 && r.left < bestR.left)) {
@@ -119,8 +134,9 @@ class FocusController extends ChangeNotifier {
     for (final id in _headerIds) {
       final e = _entries[id];
       if (e == null) continue;
+      if (!e.active) continue;
       final r = e.rect;
-      if (r == null) continue;
+      if (r == null || r.isEmpty) continue;
       if (bestR == null || r.left < bestR.left) {
         best = e;
         bestR = r;
@@ -141,8 +157,9 @@ class FocusController extends ChangeNotifier {
     for (final id in _headerIds) {
       if (id == currentId) continue;
       final e = _entries[id];
-      final to = e?.rect;
-      if (to == null) continue;
+      if (e == null || !e.active) continue;
+      final to = e.rect;
+      if (to == null || to.isEmpty) continue;
       final dx = to.center.dx - fc.dx;
       if (dir == Direction.left ? dx >= -1 : dx <= 1) continue;
       final cost = dx.abs();
@@ -168,8 +185,9 @@ class FocusController extends ChangeNotifier {
       if (e.isHeader) {
         continue; // reached only via the explicit Up-from-top path
       }
+      if (!e.active) continue;
       final to = e.rect;
-      if (to == null) continue;
+      if (to == null || to.isEmpty) continue;
       final tc = to.center;
       final dx = tc.dx - fc.dx;
       final dy = tc.dy - fc.dy;
@@ -217,8 +235,9 @@ class FocusController extends ChangeNotifier {
     if (dir != null) {
       final cur = _focusId;
       final curEntry = cur == null ? null : _entries[cur];
+      final curAlive = curEntry != null && curEntry.active;
 
-      if (curEntry?.isInput == true) {
+      if (curAlive && curEntry.isInput) {
         if (dir == Direction.left || dir == Direction.right) {
           return KeyEventResult.ignored;
         }
@@ -233,7 +252,7 @@ class FocusController extends ChangeNotifier {
       }
 
       // Header focused: left/right moves between headers, down drops to hero.
-      if (cur != null && _headerIds.contains(cur)) {
+      if (curAlive && cur != null && _headerIds.contains(cur)) {
         if (dir == Direction.down) {
           clearFocus();
           onReleaseTop?.call();
@@ -245,7 +264,7 @@ class FocusController extends ChangeNotifier {
       }
       // Nothing focused yet (hero showing). Up reaches the first header; any
       // other direction enters the content grid at the first card.
-      if (cur == null) {
+      if (cur == null || !curAlive) {
         if (dir == Direction.up) {
           final first = _firstHeader();
           if (first != null) _setFocus(first);
