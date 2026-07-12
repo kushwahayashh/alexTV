@@ -126,10 +126,7 @@ class _AppShellState extends State<_AppShell>
       canPop: !hasDetails && !_showSearch,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (hasDetails) {
-          if (!_detailsPlayerOpen) _onBack();
-          return;
-        }
+        if (hasDetails) return;
         if (_showSearch) _closeSearch();
       },
       child: Stack(
