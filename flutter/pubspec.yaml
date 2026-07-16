@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.2.2
   google_fonts: ^8.1.0
+  # Renders the inline paw glyph (rating marker) from SVG path data, mirroring
+  # the React PawIcon component 1:1.
+  flutter_svg: ^2.0.10+1
   # Self-update: save the downloaded APK to app storage, then hand it to the
   # system package installer.
   path_provider: ^2.1.5

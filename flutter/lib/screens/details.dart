@@ -5,6 +5,7 @@ import '../api/stream.dart' as stream;
 import '../api/tmdb.dart';
 import '../components/hero.dart' show FadeIn;
 import '../components/fade_image.dart';
+import '../components/paw_icon.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
 import '../routes.dart';
@@ -23,6 +24,10 @@ class _DetailsState extends State<Details> {
   final _focus = FocusController();
   final _keyboardNode = FocusNode();
   final _pageController = ScrollController();
+  // Horizontal scroll for the season pill strip. Persistent (not rebuilt) so
+  // focusing a season can smooth-scroll it to centre, mirroring the React
+  // bar's scrollIntoView({ inline: 'center' }).
+  final _seasonScroll = ScrollController();
   late final int _playId;
   late final int _watchLaterId;
 
@@ -57,13 +62,17 @@ class _DetailsState extends State<Details> {
     _focus.unregister(_playId);
     _focus.unregister(_watchLaterId);
     _pageController.dispose();
+    _seasonScroll.dispose();
     _keyboardNode.dispose();
     _focus.dispose();
     super.dispose();
   }
 
   void _scrollToTop() {
-    if (!_pageController.hasClients) return;
+    if (!_pageController.hasClients ||
+        !_pageController.position.hasContentDimensions) {
+      return;
+    }
     _pageController.animateTo(
       0,
       duration: const Duration(milliseconds: 320),
@@ -218,6 +227,7 @@ class _DetailsState extends State<Details> {
                   episodes: _episodes,
                   error: _seriesError,
                   pageController: _pageController,
+                  seasonController: _seasonScroll,
                   onSeason: (index) {
                     setState(() {
                       _activeIdx = index;
@@ -389,11 +399,22 @@ class _DetailsContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              // U+2714 + U+FE0E (text-presentation selector) forces the
-              // monochrome glyph so it respects the TextStyle color instead of
-              // falling back to Noto Color Emoji. Matches the native player's
-              // subtitle/audio selector tick.
-              Text('✔︎ ${media.rating == 0 ? '—' : media.rating}'),
+              // Paw glyph inlined before the rating, vertically centered on the
+              // text line like React's .fact-rating (align-items:center, gap
+              // 0.35em ≈ 5.6px). WidgetSpan keeps the whole fact on the row's
+              // shared text baseline.
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: PawIcon(color: AppColors.muted),
+                    ),
+                    const WidgetSpan(child: SizedBox(width: 5.6)),
+                    TextSpan(text: '${media.rating == 0 ? '—' : media.rating}'),
+                  ],
+                ),
+              ),
               if (isTv &&
                   seasons != null &&
                   flatEpisodes == null &&
@@ -447,6 +468,7 @@ List<Widget> _seriesSlivers({
   required List<stream.VideoFile>? episodes,
   required String? error,
   required ScrollController pageController,
+  required ScrollController seasonController,
   required ValueChanged<int> onSeason,
   required void Function(stream.VideoFile episode, int index) onEpisode,
 }) {
@@ -456,6 +478,7 @@ List<Widget> _seriesSlivers({
       delegate: _SeriesBarDelegate(
         seasons: seasons,
         activeIdx: activeIdx,
+        seasonController: seasonController,
         onSeason: onSeason,
       ),
     ),
@@ -540,19 +563,28 @@ Widget _seriesListSliver({
 class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
   final List<SeasonOption>? seasons;
   final int activeIdx;
+  final ScrollController seasonController;
   final ValueChanged<int> onSeason;
 
   const _SeriesBarDelegate({
     required this.seasons,
     required this.activeIdx,
+    required this.seasonController,
     required this.onSeason,
   });
 
-  @override
-  double get minExtent => 82;
+  // Fixed bar height. The child is forced to exactly this height so its paint
+  // extent always equals the declared extent — otherwise, if the content lays
+  // out shorter (e.g. a fallback font with smaller metrics before Varela Round
+  // loads, as on web), the pinned sliver throws "layoutExtent exceeds
+  // paintExtent".
+  static const double _barHeight = 82;
 
   @override
-  double get maxExtent => 82;
+  double get minExtent => _barHeight;
+
+  @override
+  double get maxExtent => _barHeight;
 
   @override
   Widget build(
@@ -561,6 +593,7 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return Container(
+      height: _barHeight,
       color: AppColors.bg,
       padding: const EdgeInsets.fromLTRB(
         AppSizes.pagePadding,
@@ -578,7 +611,10 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(width: 28),
+          // 22 (not 28) because the pill strip below carries a 6px horizontal
+          // pad for the focus-scale breathing room (React's `margin:-6px`
+          // trick). 22 + 6 = 28, matching the React heading→pill gap exactly.
+          const SizedBox(width: 22),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -586,6 +622,9 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
                     ? 1.0
                     : constraints.maxWidth;
                 final fadeStop = (28.0 / width).clamp(0.0, 0.5).toDouble();
+                // Always-on 28px edge fade on both sides, matching the React
+                // .series__seasons mask-image 1:1 (fade is static, not
+                // scroll-aware).
                 return ShaderMask(
                   shaderCallback: (bounds) => LinearGradient(
                     begin: Alignment.centerLeft,
@@ -599,30 +638,55 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
                     stops: [0, fadeStop, 1 - fadeStop, 1],
                   ).createShader(bounds),
                   blendMode: BlendMode.dstIn,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const ClampingScrollPhysics(),
-                    clipBehavior: Clip.none,
-                    child: Row(
-                      children: seasons == null
-                          ? [
-                              for (int i = 0; i < 3; i++)
-                                const _SeasonSkeleton(),
-                            ]
-                          : [
-                              for (int i = 0; i < seasons!.length; i++)
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    right: i == seasons!.length - 1 ? 0 : 12,
+                  // Clip horizontally only: pills scrolled off the left mustn't
+                  // paint over the "Episodes" heading, but the focused pill's
+                  // 1.06 scale must be free to overflow vertically without being
+                  // cut (the 82px bar is vertically tight). React gets this room
+                  // from the scroll container's `padding:6px; margin:-6px`; a
+                  // horizontal-only clip is the equivalent here.
+                  child: ClipRect(
+                    clipper: _HorizontalClipper(),
+                    child: SingleChildScrollView(
+                      controller: seasonController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      // No box clip here — the ClipRect above handles horizontal
+                      // clipping and leaves vertical overflow (the focus scale)
+                      // free.
+                      clipBehavior: Clip.none,
+                      // 6px horizontal breathing room = React's `padding:6px`
+                      // on .series__seasons. It seats the first/last pill 6px
+                      // inside the scroll content so a focused pill's 1.06 scale
+                      // at either edge isn't hard-clipped, and the 28px fade eats
+                      // ~22px of the edge pill (not its whole edge). Vertical
+                      // scale room is already granted by _HorizontalClipper, so
+                      // this stays horizontal-only (React's -6px margin is folded
+                      // into the 22px heading gap above).
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Row(
+                        children: seasons == null
+                            ? [
+                                for (int i = 0; i < 3; i++)
+                                  const _SeasonSkeleton(),
+                              ]
+                            : [
+                                for (int i = 0; i < seasons!.length; i++)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      right: i == seasons!.length - 1 ? 0 : 12,
+                                    ),
+                                    child: _SeasonTab(
+                                      key: ValueKey(
+                                        '${seasons![i].fid ?? 'flat'}-$i',
+                                      ),
+                                      label: seasons![i].label,
+                                      active: i == activeIdx,
+                                      stripController: seasonController,
+                                      onSelect: () => onSeason(i),
+                                    ),
                                   ),
-                                  child: _SeasonTab(
-                                    label: seasons![i].label,
-                                    active: i == activeIdx,
-                                    enabled: true,
-                                    onSelect: () => onSeason(i),
-                                  ),
-                                ),
-                            ],
+                              ],
+                      ),
                     ),
                   ),
                 );
@@ -641,16 +705,32 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
+/// Clips only the horizontal axis, leaving vertical overflow free. Lets the
+/// season strip hide pills scrolled past the left/right edges (so they don't
+/// paint over the "Episodes" heading) while a focused pill's 1.06 scale can
+/// still overflow the bar's tight height without being cut top/bottom.
+class _HorizontalClipper extends CustomClipper<Rect> {
+  @override
+  Rect getClip(Size size) =>
+      // Full width, but a generous vertical margin so the scaled focus pill is
+      // never clipped top/bottom (the bar itself is only ~82px tall).
+      Rect.fromLTRB(0, -size.height, size.width, size.height * 2);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
+}
+
 class _SeasonTab extends StatefulWidget {
   final String label;
   final bool active;
-  final bool enabled;
+  final ScrollController stripController;
   final VoidCallback onSelect;
 
   const _SeasonTab({
+    super.key,
     required this.label,
     required this.active,
-    required this.enabled,
+    required this.stripController,
     required this.onSelect,
   });
 
@@ -670,17 +750,9 @@ class _SeasonTabState extends State<_SeasonTab> {
       _controller = FocusScopeProvider.read(context);
       _id = _controller.register(
         onSelect: widget.onSelect,
-        active: widget.enabled,
+        onFocused: _centerInStrip,
       );
       _registered = true;
-    }
-  }
-
-  @override
-  void didUpdateWidget(_SeasonTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_registered && oldWidget.enabled != widget.enabled) {
-      _controller.setActive(_id, widget.enabled);
     }
   }
 
@@ -690,14 +762,43 @@ class _SeasonTabState extends State<_SeasonTab> {
     super.dispose();
   }
 
+  /// Scroll the horizontal season strip so this pill sits at its horizontal
+  /// center — mirrors the React `scrollIntoView({ inline: 'center' })` so
+  /// D-padding across seasons keeps the focused pill in view instead of leaving
+  /// it clipped under the edge fade.
+  void _centerInStrip() {
+    final strip = widget.stripController;
+    if (!strip.hasClients || !strip.position.hasContentDimensions) return;
+    final ctx = _controller.keyOf(_id).currentContext;
+    if (ctx == null) return;
+    final box = ctx.findRenderObject() as RenderBox?;
+    final viewport = box == null ? null : RenderAbstractViewport.maybeOf(box);
+    if (box == null || !box.attached || viewport == null) return;
+    // Offset that brings the pill's center to the viewport's center (0.5).
+    final target = viewport.getOffsetToReveal(box, 0.5).offset.clamp(
+      strip.position.minScrollExtent,
+      strip.position.maxScrollExtent,
+    );
+    strip.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = FocusScopeProvider.of(context);
     final focused = controller.isFocused(_id);
+    final textColor = focused
+        ? AppColors.bg
+        : widget.active
+        ? AppColors.text
+        : AppColors.muted;
     return KeyedSubtree(
       key: _controller.keyOf(_id),
       child: GestureDetector(
-        onTap: widget.enabled ? widget.onSelect : null,
+        onTap: widget.onSelect,
         child: AnimatedScale(
           scale: focused ? 1.06 : 1.0,
           duration: const Duration(milliseconds: 160),
@@ -714,17 +815,18 @@ class _SeasonTabState extends State<_SeasonTab> {
                   : Colors.white.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Text(
-              widget.label,
-              style: TextStyle(
-                color: focused
-                    ? AppColors.bg
-                    : widget.active
-                    ? AppColors.text
-                    : AppColors.muted,
+            // Merge onto the inherited DefaultTextStyle (which carries Varela
+            // Round from the theme) instead of replacing it — a bare TextStyle
+            // here would drop the font family back to Roboto.
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              style: DefaultTextStyle.of(context).style.copyWith(
+                color: textColor,
                 fontSize: 15.7,
                 fontWeight: FontWeight.w700,
               ),
+              child: Text(widget.label),
             ),
           ),
         ),
@@ -797,6 +899,9 @@ class _EpisodeRowState extends State<_EpisodeRow> {
     final viewport = RenderAbstractViewport.maybeOf(box);
     final page = widget.pageController;
     if (!page.hasClients || viewport == null) return;
+    // hasClients can be true before first layout sets the scroll dimensions;
+    // animateTo would then read a null minScrollExtent and crash.
+    if (!page.position.hasContentDimensions) return;
     final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
     final target = (revealTop - 286).clamp(
       page.position.minScrollExtent,
@@ -943,19 +1048,45 @@ class _DetailsButton extends StatelessWidget {
   }
 }
 
-class _SeasonSkeleton extends StatelessWidget {
+class _SeasonSkeleton extends StatefulWidget {
   const _SeasonSkeleton();
+
+  @override
+  State<_SeasonSkeleton> createState() => _SeasonSkeletonState();
+}
+
+class _SeasonSkeletonState extends State<_SeasonSkeleton>
+    with SingleTickerProviderStateMixin {
+  // Opacity pulse 0.5 ↔ 1.0 over 1.8s, matching the React `skeletonPulse`
+  // keyframes (and the Search poster skeleton).
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat(reverse: true);
+  late final Animation<double> _opacity = Tween<double>(
+    begin: 0.5,
+    end: 1.0,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 12),
-      child: Container(
-        width: 116,
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(999),
+      child: FadeTransition(
+        opacity: _opacity,
+        child: Container(
+          width: 116,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
       ),
     );

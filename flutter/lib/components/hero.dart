@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api/tmdb.dart';
 import '../theme.dart';
 import 'fade_image.dart';
+import 'paw_icon.dart';
 
 /// Cinematic hero that auto-rotates through featured titles on its own.
 /// Backdrop + content cross-fade on each change (no zoom/slide) — ported from
@@ -163,11 +164,22 @@ class _HeroContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              // U+2714 followed by U+FE0E (text-presentation selector): forces
-              // the monochrome text glyph instead of the Noto Color Emoji
-              // fallback, so it respects the muted color and matches the native
-              // subtitle/audio selector tick.
-              Text('✔︎ ${media.rating == 0 ? '—' : media.rating}'),
+              // Paw glyph inlined before the rating, vertically centered on the
+              // text line like React's .fact-rating (align-items:center, gap
+              // 0.35em ≈ 5.6px). WidgetSpan keeps the whole fact on the row's
+              // shared text baseline.
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: PawIcon(color: AppColors.muted),
+                    ),
+                    const WidgetSpan(child: SizedBox(width: 5.6)),
+                    TextSpan(text: '${media.rating == 0 ? '—' : media.rating}'),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
