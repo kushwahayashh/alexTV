@@ -163,7 +163,23 @@ class _HeroContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              Text('✔ ${media.rating == 0 ? '—' : media.rating}'),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Icon(
+                        Icons.check,
+                        size: 16,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' ${media.rating == 0 ? '—' : media.rating}',
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
