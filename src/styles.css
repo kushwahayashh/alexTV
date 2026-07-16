@@ -159,6 +159,18 @@ body {
   font-weight: 600;
   margin-bottom: 16px;
 }
+/* Rating fact: center the paw glyph against the number instead of letting the
+   SVG sit on the text baseline (which drops it low). */
+.fact-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.paw-icon {
+  display: block;
+  width: 1.05em;
+  height: 1.05em;
+}
 .hero__overview {
   color: #d7dee5;
   font-size: 1.02rem;
@@ -230,6 +242,9 @@ body {
   height: 100vh;
   overflow-y: auto;
   scrollbar-width: none;
+  /* Focused episode settles ~3 rows below the sticky season bar (82px bar +
+     ~3×68px rows) so a few episodes stay visible above it for context. */
+  scroll-padding-top: 286px;
 }
 .details::-webkit-scrollbar {
   display: none;
@@ -252,12 +267,18 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(11, 15, 20, 0.95) 0%, rgba(11, 15, 20, 0.4) 55%, transparent 100%),
-    linear-gradient(0deg, var(--bg) 2%, transparent 45%);
+    linear-gradient(90deg, rgba(8, 8, 10, 0.95) 0%, rgba(8, 8, 10, 0.4) 55%, transparent 100%),
+    linear-gradient(
+      0deg,
+      var(--bg) 0%,
+      rgba(8, 8, 10, 0.85) 12%,
+      rgba(8, 8, 10, 0.35) 30%,
+      transparent 55%
+    );
 }
 .details__content {
   position: absolute;
-  bottom: 120px;
+  bottom: 20px;
   left: 48px;
   max-width: 50%;
   z-index: 1;
@@ -290,6 +311,264 @@ body {
   display: flex;
   gap: 14px;
   margin-top: 28px;
+}
+
+/* ---------- Series: season bar + episode list ---------- */
+/* For series the hero is shorter so the season bar + first episodes are
+   visible without scrolling. */
+.details__hero--tv {
+  height: 72vh;
+}
+.series {
+  position: relative;
+  z-index: 1;
+  padding: 0 48px 72px;
+}
+/* Header: "Episodes" label + season pills. Sticky to the top so seasons stay
+   reachable while episodes scroll underneath. Solid bg so rows clip cleanly. */
+.series__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 18px 0 16px;
+  background: var(--bg);
+}
+.series__heading {
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+}
+.series__seasons {
+  display: flex;
+  gap: 12px;
+  /* Horizontal scroll only. overflow-x:auto alone forces overflow-y to compute
+     to auto too (CSS spec), which would let the bar scroll vertically — pin it. */
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px;
+  margin: -6px;
+  scrollbar-width: none;
+  /* Soft left/right edge fades so pills dissolve into the panel instead of
+     hard-clipping at the scroll edges (mirrors the player-ui top/bottom fades).
+     On Compose this maps to a horizontal Brush.horizontalGradient mask. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent 100%
+  );
+}
+.series__seasons::-webkit-scrollbar {
+  display: none;
+}
+.season-tab {
+  flex: 0 0 auto;
+  padding: 8px 22px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+.season-tab--active {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+}
+.season-tab--focused {
+  background: var(--focus);
+  color: var(--bg);
+  transform: scale(1.06);
+}
+.season-tab--skeleton {
+  width: 116px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeletonPulse 1.8s ease-in-out infinite;
+}
+
+.series__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.series__empty {
+  color: var(--muted);
+  font-size: 1.05rem;
+  padding: 24px 4px;
+}
+
+/* Episodes: a single-column stack of chips — number, title + filename, runtime. */
+.ep-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.ep-row--focused {
+  background: var(--focus);
+  color: var(--bg);
+}
+.ep-row__num {
+  flex: 0 0 auto;
+  min-width: 30px;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.ep-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ep-row__title {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ep-row__file {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ep-row__dur {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Focused chip flips to a light fill — recolor the muted children to match. */
+.ep-row--focused .ep-row__num,
+.ep-row--focused .ep-row__file,
+.ep-row--focused .ep-row__dur {
+  color: var(--bg);
+}
+/* The filename stays visually secondary even on the light focused fill. */
+.ep-row--focused .ep-row__file {
+  opacity: 0.7;
+}
+/* Loading skeleton row. */
+.ep-row--skeleton {
+  height: 60px;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeletonPulse 1.8s ease-in-out infinite;
+}
+
+/* ---------- Search ---------- */
+.search {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px 48px 64px;
+  /* Keep the nav + search bar in view when a focused row lifts to the top
+     (focus engine scrolls with block:'start'). */
+  scroll-padding-top: 130px;
+  scrollbar-width: none;
+}
+.search::-webkit-scrollbar {
+  display: none;
+}
+.search__topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.search__nav {
+  display: flex;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.search__bar-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Fill the rest of the nav row, capped so it stays compact. */
+  flex: 1 1 auto;
+  max-width: 480px;
+}
+.search__icon {
+  position: absolute;
+  left: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.search__input {
+  width: 100%;
+  padding: 13px 22px 13px 50px;
+  border: none;
+  border-radius: 999px;
+  /* Match the navbar pill buttons; no focused-color swap. */
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  outline: none;
+}
+.search__input::placeholder {
+  color: var(--muted);
+}
+.search__msg {
+  color: var(--muted);
+  font-size: 1.1rem;
+  padding: 40px 4px;
+}
+.search__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 158px);
+  gap: 32px 16px;
+  /* Room for the focused poster's scale-up to breathe without clipping. */
+  padding: 24px 0;
+  justify-content: start;
+}
+.poster--skeleton {
+  background: rgba(255, 255, 255, 0.04);
+  animation: skeletonPulse 1.8s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* ---------- Player overlay ---------- */

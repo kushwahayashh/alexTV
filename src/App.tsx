@@ -1,46 +1,74 @@
 import { useCallback, useRef, useState } from 'react'
 import { FocusProvider, type FocusApi } from './focus/FocusEngine'
 import { Home } from './screens/Home'
+import { Search } from './screens/Search'
 import { Details } from './screens/Details'
 import type { Media } from './api/tmdb'
 
 export default function App() {
   const [selected, setSelected] = useState<Media | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
   // Imperative handle into the focus engine, populated by FocusProvider.
   const focusApi = useRef<FocusApi | null>(null)
-  // The Home card that was focused when we entered Details, so Back can
-  // return focus to it instead of dumping the user at the first card.
-  const savedFocus = useRef<string | null>(null)
+  // The card/button focused before we pushed the next screen, so Back can
+  // return focus there instead of dumping the user at the first item. One slot
+  // per layer: search remembers the Home button, details remembers the card
+  // (on Home or in Search) it was opened from.
+  const searchReturnFocus = useRef<string | null>(null)
+  const detailsReturnFocus = useRef<string | null>(null)
 
-  // Open Details: remember the focused Home card first.
+  // Open Details from whichever screen is on top; remember the focused item.
   const handleSelect = useCallback((m: Media) => {
-    savedFocus.current = focusApi.current?.getFocusId() ?? null
+    detailsReturnFocus.current = focusApi.current?.getFocusId() ?? null
     setSelected(m)
   }, [])
 
-  // Back: drop the selection (Home is still mounted underneath) and restore
-  // the card that was focused before. Functional update keeps the closure from
-  // capturing a stale `selected`, so the FocusProvider listener never
-  // re-registers on every render.
-  const handleBack = useCallback(() => {
+  // Back from Details: drop the selection (the screen underneath is still
+  // mounted) and restore the item it was opened from.
+  const handleCloseDetails = useCallback(() => {
     setSelected((s) => {
       if (!s) return s
-      const saved = savedFocus.current
-      // Restore after the commit that re-shows Home and unmounts Details.
+      const saved = detailsReturnFocus.current
       if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
       return null
     })
   }, [])
 
+  // Open Search from Home; remember the focused Home button.
+  const handleOpenSearch = useCallback(() => {
+    searchReturnFocus.current = focusApi.current?.getFocusId() ?? null
+    setShowSearch(true)
+  }, [])
+
+  // Back from Search: return to Home and restore the button that opened it.
+  const handleCloseSearch = useCallback(() => {
+    setShowSearch(false)
+    const saved = searchReturnFocus.current
+    if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
+  }, [])
+
+  // Back button routes to the topmost layer: Details → Search → Home.
+  const handleBack = useCallback(() => {
+    if (selected) handleCloseDetails()
+    else if (showSearch) handleCloseSearch()
+  }, [selected, showSearch, handleCloseDetails, handleCloseSearch])
+
   return (
     <FocusProvider onBack={handleBack} apiRef={focusApi}>
       {/* Home stays mounted so its rails data, scroll position and focused
-          card all survive a round-trip into Details — it's only hidden while
-          Details is on top. display:contents keeps it layout-transparent when
-          visible (as if this wrapper weren't here). */}
-      <div style={{ display: selected ? 'none' : 'contents' }}>
-        <Home onSelect={handleSelect} />
+          card all survive a round-trip into Search/Details — it's only hidden
+          while a screen is on top. display:contents keeps it layout-transparent
+          when visible (as if this wrapper weren't here). */}
+      <div style={{ display: selected || showSearch ? 'none' : 'contents' }}>
+        <Home onSelect={handleSelect} onOpenSearch={handleOpenSearch} />
       </div>
+      {/* Search likewise stays mounted (hidden) under Details so Back from a
+          result returns to the same query and grid position. */}
+      {showSearch && (
+        <div style={{ display: selected ? 'none' : 'contents' }}>
+          <Search onSelect={handleSelect} onGoHome={handleCloseSearch} />
+        </div>
+      )}
       {selected && <Details media={selected} />}
     </FocusProvider>
   )

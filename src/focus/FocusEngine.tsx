@@ -38,6 +38,15 @@ type FocusableEntry = {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
+  // Text input: typing, Space, Backspace and Left/Right (caret) pass through to
+  // the field; only Up (header) and Down/Enter (into the grid) navigate away.
+  isInput?: boolean
+  // 'top' scrolls the nearest scroll container fully to the top on focus (used
+  // by hero action buttons so focusing them shows the whole hero instead of
+  // lifting the button to the viewport top). 'nearest' scrolls only enough to
+  // reveal the element (episode rows, so the hero stays visible). Default lifts
+  // the element to the top (block:'start').
+  scrollMode?: 'start' | 'top' | 'nearest'
   active: boolean
 }
 
@@ -133,11 +142,36 @@ export function FocusProvider({
   const setFocus = useCallback((id: string) => {
     if (!entries.current.has(id)) return
     setFocusId(id)
-    entries.current.get(id)?.onFocus?.()
+    const entry = entries.current.get(id)
+    entry?.onFocus?.()
+    // 'top' entries (hero action buttons) scroll their container fully to the
+    // top so the whole hero shows, instead of lifting the button to the edge.
+    if (entry?.scrollMode === 'top') {
+      let p: HTMLElement | null = entry.element.parentElement
+      while (p) {
+        const oy = getComputedStyle(p).overflowY
+        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
+          p.scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        }
+        p = p.parentElement
+      }
+      return
+    }
+    // 'nearest' entries (episode rows) scroll only enough to come into view,
+    // so moving down the list doesn't yank the hero off screen.
+    if (entry?.scrollMode === 'nearest') {
+      entry.element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      })
+      return
+    }
     // block:'start' + the container's scroll-padding-top lifts the focused row
     // to a comfortable spot near the top so it's never clipped by the viewport
     // edge or the scaled-up focus outline.
-    entries.current.get(id)?.element.scrollIntoView({
+    entry?.element.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
       inline: 'center',
@@ -240,6 +274,9 @@ export function FocusProvider({
         const e = entries.current.get(id)
         if (!e) continue
         const to = rectOf(e.element)
+        // Skip hidden headers (zero rect), e.g. Home's header sitting mounted
+        // behind the Search screen.
+        if (to.width <= 0 && to.height <= 0) continue
         const dx = to.cx - from.cx
         if (dir === 'left' ? dx >= -1 : dx <= 1) continue
         const cost = Math.abs(dx)
@@ -260,12 +297,29 @@ export function FocusProvider({
       }
 
       if (e.key in dirMap) {
-        e.preventDefault()
         const cur = focusIdRef.current
         const dir = dirMap[e.key]
         // Entry may be stale (leftover from a previous screen). Treat it as
         // no-focus so the first keypress on the new screen seeds correctly.
         const curAlive = cur != null && entries.current.has(cur)
+
+        // Text input focused: Left/Right belong to the caret — let the browser
+        // handle them and don't navigate away. Up/Down still leave the field.
+        if (curAlive && entries.current.get(cur!)?.isInput) {
+          if (dir === 'left' || dir === 'right') return
+          e.preventDefault()
+          if (dir === 'up') {
+            const first = firstHeader()
+            if (first) setFocus(first.id)
+          } else {
+            // Down: drop into the results grid (first focusable below).
+            const next = findNext(entries.current, cur!, 'down')
+            if (next) setFocus(next)
+          }
+          return
+        }
+
+        e.preventDefault()
 
         // Header focused: left/right moves between headers, down drops to hero.
         if (curAlive && headerIdsRef.current.has(cur!)) {
@@ -299,14 +353,24 @@ export function FocusProvider({
         return
       }
 
+      const curEntry =
+        focusIdRef.current != null
+          ? entries.current.get(focusIdRef.current)
+          : null
+      const inInput = curEntry?.isInput === true
+
       if (e.key === 'Enter' || e.key === ' ') {
+        // Space types into a focused input; only Enter acts on it.
+        if (inInput && e.key === ' ') return
         e.preventDefault()
-        const cur = focusIdRef.current
-        if (cur) entries.current.get(cur)?.onSelect?.()
+        if (curEntry) curEntry.onSelect?.()
         return
       }
 
       if (e.key === 'Escape' || e.key === 'Backspace') {
+        // Backspace edits the text in a focused input rather than going back;
+        // Escape still exits.
+        if (inInput && e.key === 'Backspace') return
         e.preventDefault()
         onBack?.()
       }
@@ -332,6 +396,8 @@ export function useFocusable(opts?: {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
+  isInput?: boolean
+  scrollMode?: 'start' | 'top' | 'nearest'
   active?: boolean
 }) {
   const ctx = useContext(FocusContext)
@@ -364,6 +430,8 @@ export function useFocusable(opts?: {
       onSelect: () => optsRef.current?.onSelect?.(),
       onFocus: () => optsRef.current?.onFocus?.(),
       isHeader: optsRef.current?.isHeader,
+      isInput: optsRef.current?.isInput,
+      scrollMode: optsRef.current?.scrollMode,
       active: optsRef.current?.active !== false,
     })
     return () => unregisterRef.current(id)

@@ -1,5 +1,6 @@
 import { IMG, type Media } from '../api/tmdb'
 import { FadeImage } from './FadeImage'
+import { PawIcon } from './PawIcon'
 
 /** Cinematic hero that auto-rotates through featured titles on its own. */
 export function Hero({ media }: { media: Media | null }) {
@@ -22,7 +23,7 @@ export function Hero({ media }: { media: Media | null }) {
         <div className="hero__facts">
           <span>{media.mediaType === 'tv' ? 'Series' : 'Movie'}</span>
           {media.year && <span>{media.year}</span>}
-          <span>★ {media.rating || '—'}</span>
+          <span className="fact-rating"><PawIcon />{media.rating || '—'}</span>
         </div>
         <p className="hero__overview">{media.overview}</p>
       </div>

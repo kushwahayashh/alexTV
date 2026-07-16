@@ -12,21 +12,52 @@ import type { Media } from '../api/tmdb'
 type Phase = 'loading' | 'files' | 'links' | 'playing' | 'error'
 
 /**
- * Three-step playback modal:
- *   1. Resolve movie → list video files
- *   2. Pick a file → fetch stream links (quality options)
- *   3. Pick a link → play in <video> (HLS via hls.js, native mp4)
+ * Playback modal. Two entry modes:
+ *   • Movie (no `startFid`): resolve title → list files → pick file → links → play.
+ *   • Episode (`startFid` given): the caller (Details) already resolved the
+ *     episode file, so skip straight to fetching its quality links → play.
  */
-export function Player({ media, onClose }: { media: Media; onClose: () => void }) {
+export function Player({
+  media,
+  startFid,
+  title,
+  onClose,
+}: {
+  media: Media
+  startFid?: number
+  title?: string
+  onClose: () => void
+}) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [files, setFiles] = useState<VideoFile[]>([])
   const [links, setLinks] = useState<StreamLink[]>([])
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  // Kick off the resolve chain on mount.
+  // Title shown on the playback controls (episode label or movie title).
+  const displayTitle = title || media.title
+
+  // Kick off the resolve chain on mount. Episodes skip resolve — the caller
+  // handed us the file's fid, so go straight to its links.
   useEffect(() => {
     let alive = true
+    if (startFid != null) {
+      getLinks(startFid)
+        .then((l) => {
+          if (!alive) return
+          setLinks(l)
+          setPhase(l.length ? 'links' : 'error')
+          if (!l.length) setError('No stream links for this episode.')
+        })
+        .catch((e) => {
+          if (!alive) return
+          setError(String(e.message || e))
+          setPhase('error')
+        })
+      return () => {
+        alive = false
+      }
+    }
     resolveMovie(media.title, media.year)
       .then((f) => {
         if (!alive) return
@@ -42,24 +73,25 @@ export function Player({ media, onClose }: { media: Media; onClose: () => void }
     return () => {
       alive = false
     }
-  }, [media])
+  }, [media, startFid])
 
   // Intercept Escape in capture phase so it closes the player instead of
   // bubbling to the FocusEngine's onBack (which would exit Details entirely).
+  // Back ladder: links → files (movie) or links → close (episode).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape' && e.key !== 'Backspace') return
       e.preventDefault()
       e.stopPropagation()
       setPhase((p) => {
-        if (p === 'links') return 'files'
+        if (p === 'links' && startFid == null) return 'files'
         onClose()
         return p
       })
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  }, [onClose, startFid])
 
   // Play a given stream link.
   function playLink(link: StreamLink) {
@@ -103,7 +135,7 @@ export function Player({ media, onClose }: { media: Media; onClose: () => void }
       )}
 
       {phase === 'playing' && streamUrl && (
-        <VideoPlayer url={streamUrl} />
+        <VideoPlayer url={streamUrl} title={displayTitle} />
       )}
 
       {phase === 'error' && (
@@ -194,7 +226,7 @@ function QualityPicker({
 }
 
 /* ---------- Step 3: Video player ---------- */
-function VideoPlayer({ url }: { url: string }) {
+function VideoPlayer({ url, title }: { url: string; title: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [usingHls, setUsingHls] = useState(false)
 
@@ -235,7 +267,7 @@ function VideoPlayer({ url }: { url: string }) {
         playsInline
       />
       {usingHls && <div className="player-badge">HLS</div>}
-      <PlayerControls title="Inception" />
+      <PlayerControls title={title} />
     </div>
   )
 }

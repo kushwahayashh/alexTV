@@ -6,7 +6,13 @@ import { HeaderButton } from '../components/HeaderButton'
 
 const HERO_ROTATE_MS = 10000
 
-export function Home({ onSelect }: { onSelect: (m: Media) => void }) {
+export function Home({
+  onSelect,
+  onOpenSearch,
+}: {
+  onSelect: (m: Media) => void
+  onOpenSearch: () => void
+}) {
   const [rails, setRails] = useState<RailData[]>([])
   const [featured, setFeatured] = useState<Media[]>([])
   const [heroIndex, setHeroIndex] = useState(0)
@@ -55,7 +61,7 @@ export function Home({ onSelect }: { onSelect: (m: Media) => void }) {
         <Hero media={featured[heroIndex] ?? null} />
         <div className="home__header home__header--left">
           <HeaderButton label="Home" />
-          <HeaderButton label="Search" />
+          <HeaderButton label="Search" onSelect={onOpenSearch} />
           <HeaderButton label="Library" />
         </div>
         <div className="home__header home__header--right">

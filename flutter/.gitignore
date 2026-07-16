@@ -31,6 +31,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+# Build output in any subproject (e.g. android/build/), not just the root.
+**/build/
 /coverage/
 
 # Symbolication related

@@ -66,6 +66,27 @@ async function get(path: string): Promise<TmdbItem[]> {
   return json.results ?? []
 }
 
+/**
+ * TMDB multi-search — the search box data source. Mirrors the reference impl:
+ * hit /search/multi, drop `person` results and anything without a poster, and
+ * normalize to the shared Media shape so results reuse PosterCard / Details.
+ * media_type is present on multi-search rows, so normalize keys off it (the
+ * 'movie' fallback only applies to the rare row missing the field).
+ */
+export async function searchMulti(query: string): Promise<Media[]> {
+  const q = query.trim()
+  if (!q) return []
+  const items = await get(
+    `/search/multi?query=${encodeURIComponent(q)}&include_adult=false`,
+  )
+  return items
+    .filter(
+      (i) =>
+        (i.media_type === 'movie' || i.media_type === 'tv') && i.poster_path,
+    )
+    .map((i) => normalize(i, 'movie'))
+}
+
 export type Rail = { title: string; items: Media[] }
 
 export async function fetchHomeRails(): Promise<Rail[]> {

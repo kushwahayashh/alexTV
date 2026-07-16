@@ -5,10 +5,16 @@ import { useFocusable } from '../focus/FocusEngine'
  * focusable header item so it's reached by pressing Up from the hero.
  * Mock for now — selecting it does nothing.
  */
-export function HeaderButton({ label }: { label: string }) {
+export function HeaderButton({
+  label,
+  onSelect,
+}: {
+  label: string
+  onSelect?: () => void
+}) {
   const { ref, focused } = useFocusable({
     isHeader: true,
-    onSelect: () => {},
+    onSelect: () => onSelect?.(),
     onFocus: () => {
       const el = document.querySelector('.home') as HTMLElement | null
       el?.scrollTo({ top: 0, behavior: 'smooth' })
