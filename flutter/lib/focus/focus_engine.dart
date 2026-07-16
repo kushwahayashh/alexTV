@@ -302,9 +302,15 @@ class FocusController extends ChangeNotifier {
       return KeyEventResult.handled;
     }
 
+    // NOTE: `goBack` (Android KEYCODE_BACK) is deliberately NOT handled here.
+    // On Android TV the hardware Back button is dispatched by the framework's
+    // Navigator/PopScope back-button observer, which pops exactly one route.
+    // If we also consumed it here and called onBack (which pops), a single
+    // press would tear down two levels — the intermittent "Back jumps to Home"
+    // bug. Escape/Backspace remain for desktop dev, where there's no system
+    // back dispatcher.
     if (event.logicalKey == LogicalKeyboardKey.escape ||
-        event.logicalKey == LogicalKeyboardKey.backspace ||
-        event.logicalKey == LogicalKeyboardKey.goBack) {
+        event.logicalKey == LogicalKeyboardKey.backspace) {
       final cur = _focusId;
       final curEntry = cur == null ? null : _entries[cur];
       if (curEntry?.isInput == true &&

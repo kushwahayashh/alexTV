@@ -6,23 +6,13 @@ import '../components/hero.dart' as ui;
 import '../components/rail.dart';
 import '../components/update_button.dart';
 import '../focus/focus_engine.dart';
+import '../main.dart' show openDetails, openSearch;
 import '../theme.dart';
 
 const _heroRotateMs = 10000;
 
 class Home extends StatefulWidget {
-  final void Function(api.Media) onSelect;
-  final VoidCallback onOpenSearch;
-
-  /// False while Details is on top. Home stays mounted (so its data, scroll and
-  /// focused card survive) but must not hold keyboard focus or react to keys.
-  final bool active;
-  const Home({
-    super.key,
-    required this.onSelect,
-    required this.onOpenSearch,
-    this.active = true,
-  });
+  const Home({super.key});
 
   @override
   State<Home> createState() => _HomeState();
@@ -43,22 +33,6 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void didUpdateWidget(Home old) {
-    super.didUpdateWidget(old);
-    // Returning from Details: reclaim keyboard focus so D-pad keys route here
-    // again. The FocusController still holds the previously-focused card, so
-    // the visual highlight and scroll position are already intact.
-    if (widget.active && !old.active) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _keyboardNode.requestFocus();
-      });
-    } else if (!widget.active && old.active) {
-      // Going behind Details: release focus so Details' handler gets the keys.
-      _keyboardNode.unfocus();
-    }
   }
 
   Future<void> _load() async {
@@ -114,21 +88,17 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      // No PopScope here — the app shell owns the Home-level Back so it isn't
-      // double-handled while Details is mounted on top.
+      // No PopScope here — Home is the root route, so hardware Back falls
+      // through to the system and exits to the launcher. When Details/Search
+      // are pushed on top, the Navigator disables Home's focus scope, so this
+      // key handler simply stops receiving events until they pop.
       body: FocusScopeProvider(
         controller: _focus,
         child: Focus(
           focusNode: _keyboardNode,
           autofocus: true,
-          canRequestFocus: widget.active,
-          onKeyEvent: (_, event) => widget.active
-              ? _focus.handleKey(
-                  event,
-                  () => debugPrint('BACK pressed'),
-                  _releaseToTop,
-                )
-              : KeyEventResult.ignored,
+          onKeyEvent: (_, event) =>
+              _focus.handleKey(event, null, _releaseToTop),
           child: _buildBody(),
         ),
       ),
@@ -167,7 +137,7 @@ class _HomeState extends State<Home> {
                         HeaderButton(
                           label: 'Search',
                           onFocused: _releaseToTop,
-                          onSelect: widget.onOpenSearch,
+                          onSelect: () => openSearch(context),
                         ),
                         const SizedBox(width: 12),
                         HeaderButton(
@@ -196,7 +166,7 @@ class _HomeState extends State<Home> {
                         Rail(
                           rail: rail,
                           pageController: _pageController,
-                          onSelect: widget.onSelect,
+                          onSelect: (m) => openDetails(context, m),
                         ),
                         const SizedBox(height: AppSizes.railGap),
                       ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'api/tmdb.dart' as api;
+import 'routes.dart';
 import 'screens/home.dart';
 import 'screens/search.dart';
 import 'screens/details.dart';
@@ -28,153 +29,27 @@ class AlexTvApp extends StatelessWidget {
         // so they inherit Varela Round from this text theme.
         textTheme: GoogleFonts.varelaRoundTextTheme(base.textTheme),
       ),
-      home: const _DesignScaler(child: _AppShell()),
+      // Wrap the whole Navigator (not just `home`) in the design scaler, so
+      // pushed routes — Details, Search, Player — are scaled to the design
+      // canvas too. Wrapping only `home` would leave them oversized on TV.
+      builder: (context, child) => _DesignScaler(child: child!),
+      home: const Home(),
     );
   }
 }
 
-/// Routes between Home and Details, mirroring the React App.tsx `selected`
-/// state. Home stays mounted (just hidden) while Details is on top, so its
-/// rails data, scroll position and focused card all survive a round-trip —
-/// pressing Back returns to Home instantly without a refetch.
-class _AppShell extends StatefulWidget {
-  const _AppShell();
-
-  @override
-  State<_AppShell> createState() => _AppShellState();
+/// Pushes the Details screen for [media]. Home stays mounted beneath it (the
+/// Navigator keeps routes below the top alive), so its rails, scroll position
+/// and focused card all survive the round-trip — Back returns instantly with
+/// no refetch. Fully replaces the old flag-based [_AppShell] cross-fade.
+void openDetails(BuildContext context, api.Media media) {
+  Navigator.of(context).push(fadeRoute(Details(media: media)));
 }
 
-class _AppShellState extends State<_AppShell>
-    with SingleTickerProviderStateMixin {
-  api.Media? _selected;
-  bool _showSearch = false;
-  bool _detailsClosing = false;
-  bool _detailsPlayerOpen = false;
-
-  // Drives the Details fade: forward = fading in over Home, reverse = fading
-  // out back to Home. Details stays mounted through the whole reverse so the
-  // exit actually animates instead of cutting.
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 260),
-  );
-  late final Animation<double> _fade = CurvedAnimation(
-    parent: _ctrl,
-    curve: Curves.easeOut,
-    reverseCurve: Curves.easeIn,
-  );
-
-  // True only once Details has fully faded in — lets us Offstage Home to save
-  // paint work while it's fully covered, but keep it visible during the
-  // cross-fade so you see it through the fading Details.
-  bool _covered = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl.addStatusListener((status) {
-      final covered = status == AnimationStatus.completed;
-      if (covered != _covered) setState(() => _covered = covered);
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _onSelect(api.Media m) {
-    setState(() {
-      _selected = m;
-      _detailsClosing = false;
-      _detailsPlayerOpen = false;
-    });
-    _ctrl.forward(from: 0);
-  }
-
-  void _openSearch() => setState(() => _showSearch = true);
-
-  void _closeSearch() => setState(() => _showSearch = false);
-
-  void _onBack() {
-    if (_detailsClosing || _detailsPlayerOpen) return;
-    setState(() => _detailsClosing = true);
-    // Fade Details out, then drop it. Home stays put underneath the whole time.
-    // Guard on `dismissed` so a re-open that interrupts the reverse doesn't
-    // then clear the freshly-selected media.
-    _ctrl.reverse().whenComplete(() {
-      if (mounted && _ctrl.status == AnimationStatus.dismissed) {
-        setState(() {
-          _selected = null;
-          _detailsClosing = false;
-          _detailsPlayerOpen = false;
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasDetails = _selected != null;
-    final homeCovered = _covered || (_showSearch && !hasDetails);
-    // Single top-level PopScope. Because every PopScope on a route fires on a
-    // back press, the child screens' own PopScopes handle Back when they're on
-    // top. On Home (no overlay) we allow the pop so Back exits the app to the
-    // launcher; while Search/Details/Player are shown we block it.
-    return PopScope(
-      canPop: !hasDetails && !_showSearch,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (hasDetails) return;
-        if (_showSearch) _closeSearch();
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Kept mounted underneath overlays so its state is preserved. Offstage
-          // (not a conditional) is what stops it from unmounting/refetching;
-          // it still lays Home out at full size, so scroll position survives.
-          Offstage(
-            offstage: homeCovered,
-            child: TickerMode(
-              enabled: !homeCovered,
-              child: Home(
-                active: !hasDetails && !_showSearch,
-                onSelect: _onSelect,
-                onOpenSearch: _openSearch,
-              ),
-            ),
-          ),
-          if (_showSearch)
-            Offstage(
-              offstage: hasDetails,
-              child: TickerMode(
-                enabled: !hasDetails,
-                child: Search(
-                  active: !hasDetails,
-                  onSelect: _onSelect,
-                  onGoHome: _closeSearch,
-                ),
-              ),
-            ),
-          if (hasDetails)
-            FadeTransition(
-              opacity: _fade,
-              child: Details(
-                media: _selected!,
-                onBack: _onBack,
-                onPlayerOpenChanged: (open) {
-                  if (mounted && open != _detailsPlayerOpen) {
-                    setState(() => _detailsPlayerOpen = open);
-                  }
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+/// Pushes the Search screen. Selecting a result from Search pushes Details on
+/// top, so Back from Details returns to Search, then Back again to Home.
+void openSearch(BuildContext context) {
+  Navigator.of(context).push(fadeRoute(const Search()));
 }
 
 /// Lays the app out at a fixed [AppSizes.designWidth] and uniformly scales it

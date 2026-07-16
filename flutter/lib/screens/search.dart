@@ -5,6 +5,7 @@ import '../api/tmdb.dart' as api;
 import '../components/fade_image.dart';
 import '../components/header_button.dart';
 import '../focus/focus_engine.dart';
+import '../main.dart' show openDetails;
 import '../theme.dart';
 
 const _debounceMs = 350;
@@ -12,16 +13,7 @@ const _debounceMs = 350;
 enum _Status { idle, loading, ready }
 
 class Search extends StatefulWidget {
-  final void Function(api.Media) onSelect;
-  final VoidCallback onGoHome;
-  final bool active;
-
-  const Search({
-    super.key,
-    required this.onSelect,
-    required this.onGoHome,
-    this.active = true,
-  });
+  const Search({super.key});
 
   @override
   State<Search> createState() => _SearchState();
@@ -54,20 +46,6 @@ class _SearchState extends State<Search> {
       _focus.requestFocus(_fieldId);
       _fieldNode.requestFocus();
     });
-  }
-
-  @override
-  void didUpdateWidget(Search oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.active && !oldWidget.active) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _keyboardNode.requestFocus();
-      });
-    } else if (!widget.active && oldWidget.active) {
-      _keyboardNode.unfocus();
-      _fieldNode.unfocus();
-    }
   }
 
   void _onQueryChanged() {
@@ -114,8 +92,8 @@ class _SearchState extends State<Search> {
   }
 
   KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
-    if (!widget.active) return KeyEventResult.ignored;
-    return _focus.handleKey(event, widget.onGoHome, null);
+    // Back/Escape pops Search off the Navigator, returning to Home.
+    return _focus.handleKey(event, () => Navigator.of(context).maybePop(), null);
   }
 
   @override
@@ -127,7 +105,6 @@ class _SearchState extends State<Search> {
         child: Focus(
           focusNode: _keyboardNode,
           autofocus: true,
-          canRequestFocus: widget.active,
           onKeyEvent: _handleKey,
           child: SingleChildScrollView(
             controller: _pageController,
@@ -149,7 +126,7 @@ class _SearchState extends State<Search> {
                         children: [
                           HeaderButton(
                             label: 'Home',
-                            onSelect: widget.onGoHome,
+                            onSelect: () => Navigator.of(context).maybePop(),
                           ),
                           const SizedBox(width: 12),
                           const HeaderButton(label: 'Search'),
@@ -174,7 +151,7 @@ class _SearchState extends State<Search> {
                     results: _results,
                     query: _queryController.text.trim(),
                     pageController: _pageController,
-                    onSelect: widget.onSelect,
+                    onSelect: (m) => openDetails(context, m),
                   ),
                 ],
               ),

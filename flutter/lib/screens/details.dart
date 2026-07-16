@@ -7,37 +7,22 @@ import '../components/hero.dart' show FadeIn;
 import '../components/fade_image.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
+import '../routes.dart';
 import '../theme.dart';
 
 class Details extends StatefulWidget {
   final Media media;
-  final VoidCallback onBack;
-  final ValueChanged<bool>? onPlayerOpenChanged;
 
-  const Details({
-    super.key,
-    required this.media,
-    required this.onBack,
-    this.onPlayerOpenChanged,
-  });
+  const Details({super.key, required this.media});
 
   @override
   State<Details> createState() => _DetailsState();
-}
-
-class _EpisodePlay {
-  final int fid;
-  final String label;
-
-  const _EpisodePlay({required this.fid, required this.label});
 }
 
 class _DetailsState extends State<Details> {
   final _focus = FocusController();
   final _keyboardNode = FocusNode();
   final _pageController = ScrollController();
-  bool _showPlayer = false;
-  _EpisodePlay? _episodePlay;
   late final int _playId;
   late final int _watchLaterId;
 
@@ -50,24 +35,6 @@ class _DetailsState extends State<Details> {
   int? _playFid;
 
   bool get _isTv => widget.media.mediaType == 'tv';
-  bool get _playerOpen => _showPlayer || _episodePlay != null;
-
-  void _setPlayerOpen({bool? movie, _EpisodePlay? episode}) {
-    final wasOpen = _playerOpen;
-    setState(() {
-      if (movie != null) _showPlayer = movie;
-      if (episode != null) _episodePlay = episode;
-    });
-    final open = _playerOpen;
-    if (open != wasOpen) widget.onPlayerOpenChanged?.call(open);
-  }
-
-  void _clearEpisodePlayer() {
-    final wasOpen = _playerOpen;
-    setState(() => _episodePlay = null);
-    final open = _playerOpen;
-    if (open != wasOpen) widget.onPlayerOpenChanged?.call(open);
-  }
 
   @override
   void initState() {
@@ -173,7 +140,7 @@ class _DetailsState extends State<Details> {
 
   void _openPlayer() {
     if (!_isTv) {
-      _setPlayerOpen(movie: true);
+      _pushPlayer(Player(media: widget.media, onClose: _popPlayer));
       return;
     }
     final episodes = _episodes;
@@ -184,23 +151,28 @@ class _DetailsState extends State<Details> {
 
   void _openEpisode(stream.VideoFile episode, int index) {
     final num = episode.episode ?? index + 1;
-    _setPlayerOpen(
-      episode: _EpisodePlay(
-        fid: episode.fid,
-        label: '${widget.media.title} · ${epTitle(episode, num)}',
+    _pushPlayer(
+      Player(
+        media: widget.media,
+        startFid: episode.fid,
+        title: '${widget.media.title} · ${epTitle(episode, num)}',
+        onClose: _popPlayer,
       ),
     );
   }
 
-  void _closeMoviePlayer() {
-    _setPlayerOpen(movie: false);
-    _restoreDetailsFocus();
+  /// Push the player as a non-opaque overlay route so the Details page keeps
+  /// painting (and blurring) behind it. Hardware Back pops exactly this route;
+  /// when it returns, restore keyboard focus to the Play button. Because the
+  /// player is its own route, Details' key handler stops receiving events while
+  /// it's up — no flag needed to mute it.
+  void _pushPlayer(Player player) {
+    Navigator.of(
+      context,
+    ).push(fadeRoute(player, opaque: false)).then((_) => _restoreDetailsFocus());
   }
 
-  void _closeEpisodePlayer() {
-    _clearEpisodePlayer();
-    _restoreDetailsFocus();
-  }
+  void _popPlayer() => Navigator.of(context).pop();
 
   void _restoreDetailsFocus() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -213,69 +185,49 @@ class _DetailsState extends State<Details> {
   @override
   Widget build(BuildContext context) {
     final media = widget.media;
+    // No PopScope needed: Details is a pushed route, so hardware Back pops it
+    // back to Home via the Navigator. The custom key handler still routes
+    // Escape/Back on desktop through the focus engine, which pops explicitly.
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop || _playerOpen) return;
-          widget.onBack();
-        },
-        child: FocusScopeProvider(
-          controller: _focus,
-          child: Focus(
-            focusNode: _keyboardNode,
-            autofocus: true,
-            onKeyEvent: (_, event) => _playerOpen
-                ? KeyEventResult.ignored
-                : _focus.handleKey(event, widget.onBack, null),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CustomScrollView(
-                  controller: _pageController,
-                  physics: const ClampingScrollPhysics(),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _DetailsHero(
-                        media: media,
-                        isTv: _isTv,
-                        seasons: _seasons,
-                        flatEpisodes: _flatEpisodes,
-                        playId: _playId,
-                        watchLaterId: _watchLaterId,
-                      ),
-                    ),
-                    if (_isTv)
-                      ..._seriesSlivers(
-                        seasons: _seasons,
-                        activeIdx: _activeIdx,
-                        episodes: _episodes,
-                        error: _seriesError,
-                        playerOpen: _playerOpen,
-                        pageController: _pageController,
-                        onSeason: (index) {
-                          setState(() {
-                            _activeIdx = index;
-                            _episodes = null;
-                          });
-                          _loadActiveSeason();
-                        },
-                        onEpisode: _openEpisode,
-                      ),
-                  ],
+      body: FocusScopeProvider(
+        controller: _focus,
+        child: Focus(
+          focusNode: _keyboardNode,
+          autofocus: true,
+          onKeyEvent: (_, event) =>
+              _focus.handleKey(event, () => Navigator.of(context).maybePop(), null),
+          child: CustomScrollView(
+            controller: _pageController,
+            physics: const ClampingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: _DetailsHero(
+                  media: media,
+                  isTv: _isTv,
+                  seasons: _seasons,
+                  flatEpisodes: _flatEpisodes,
+                  playId: _playId,
+                  watchLaterId: _watchLaterId,
                 ),
-                if (_showPlayer)
-                  Player(media: media, onClose: _closeMoviePlayer),
-                if (_episodePlay != null)
-                  Player(
-                    media: media,
-                    startFid: _episodePlay!.fid,
-                    title: _episodePlay!.label,
-                    onClose: _closeEpisodePlayer,
-                  ),
-              ],
-            ),
+              ),
+              if (_isTv)
+                ..._seriesSlivers(
+                  seasons: _seasons,
+                  activeIdx: _activeIdx,
+                  episodes: _episodes,
+                  error: _seriesError,
+                  pageController: _pageController,
+                  onSeason: (index) {
+                    setState(() {
+                      _activeIdx = index;
+                      _episodes = null;
+                    });
+                    _loadActiveSeason();
+                  },
+                  onEpisode: _openEpisode,
+                ),
+            ],
           ),
         ),
       ),
@@ -506,7 +458,6 @@ List<Widget> _seriesSlivers({
   required int activeIdx,
   required List<stream.VideoFile>? episodes,
   required String? error,
-  required bool playerOpen,
   required ScrollController pageController,
   required ValueChanged<int> onSeason,
   required void Function(stream.VideoFile episode, int index) onEpisode,
@@ -517,7 +468,6 @@ List<Widget> _seriesSlivers({
       delegate: _SeriesBarDelegate(
         seasons: seasons,
         activeIdx: activeIdx,
-        playerOpen: playerOpen,
         onSeason: onSeason,
       ),
     ),
@@ -531,7 +481,6 @@ List<Widget> _seriesSlivers({
       sliver: _seriesListSliver(
         episodes: episodes,
         error: error,
-        playerOpen: playerOpen,
         pageController: pageController,
         onEpisode: onEpisode,
       ),
@@ -542,7 +491,6 @@ List<Widget> _seriesSlivers({
 Widget _seriesListSliver({
   required List<stream.VideoFile>? episodes,
   required String? error,
-  required bool playerOpen,
   required ScrollController pageController,
   required void Function(stream.VideoFile episode, int index) onEpisode,
 }) {
@@ -591,7 +539,7 @@ Widget _seriesListSliver({
           title: epTitle(episodes[index], episodes[index].episode ?? index + 1),
           fileName: episodes[index].fileName,
           resLabel: episodes[index].resLabel,
-          enabled: !playerOpen,
+          enabled: true,
           pageController: pageController,
           onSelect: () => onEpisode(episodes[index], index),
         ),
@@ -604,13 +552,11 @@ Widget _seriesListSliver({
 class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
   final List<SeasonOption>? seasons;
   final int activeIdx;
-  final bool playerOpen;
   final ValueChanged<int> onSeason;
 
   const _SeriesBarDelegate({
     required this.seasons,
     required this.activeIdx,
-    required this.playerOpen,
     required this.onSeason,
   });
 
@@ -684,7 +630,7 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
                                   child: _SeasonTab(
                                     label: seasons![i].label,
                                     active: i == activeIdx,
-                                    enabled: !playerOpen,
+                                    enabled: true,
                                     onSelect: () => onSeason(i),
                                   ),
                                 ),
@@ -703,8 +649,7 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _SeriesBarDelegate oldDelegate) {
     return seasons != oldDelegate.seasons ||
-        activeIdx != oldDelegate.activeIdx ||
-        playerOpen != oldDelegate.playerOpen;
+        activeIdx != oldDelegate.activeIdx;
   }
 }
 
