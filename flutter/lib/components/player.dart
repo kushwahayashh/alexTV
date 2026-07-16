@@ -158,21 +158,28 @@ class _PlayerState extends State<Player> {
       },
       child: FocusScopeProvider(
         controller: _focus,
-        child: Focus(
-          focusNode: _keyboardNode,
-          autofocus: true,
-          onKeyEvent: (_, event) => _focus.handleKey(event, _handleBack, null),
-          child: Stack(
-            children: [
-              // Dim + blur overlay.
-              Positioned.fill(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: Container(color: Colors.black.withValues(alpha: 0.6)),
+        // Transparent Material ancestor: the player is its own (non-opaque)
+        // route with no Scaffold, so text would otherwise render with the debug
+        // "no Material" yellow underlines. `type: transparency` supplies the
+        // ancestor without painting a background, so the blur/dim shows through.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Focus(
+            focusNode: _keyboardNode,
+            autofocus: true,
+            onKeyEvent: (_, event) => _focus.handleKey(event, _handleBack, null),
+            child: Stack(
+              children: [
+                // Dim + blur overlay.
+                Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(color: Colors.black.withValues(alpha: 0.6)),
+                  ),
                 ),
-              ),
-              Center(child: _buildModal()),
-            ],
+                Center(child: _buildModal()),
+              ],
+            ),
           ),
         ),
       ),

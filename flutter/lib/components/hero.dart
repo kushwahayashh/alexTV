@@ -163,23 +163,11 @@ class _HeroContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: Icon(
-                        Icons.check,
-                        size: 16,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    TextSpan(
-                      text: ' ${media.rating == 0 ? '—' : media.rating}',
-                    ),
-                  ],
-                ),
-              ),
+              // U+2714 followed by U+FE0E (text-presentation selector): forces
+              // the monochrome text glyph instead of the Noto Color Emoji
+              // fallback, so it respects the muted color and matches the native
+              // subtitle/audio selector tick.
+              Text('✔︎ ${media.rating == 0 ? '—' : media.rating}'),
             ],
           ),
         ),
