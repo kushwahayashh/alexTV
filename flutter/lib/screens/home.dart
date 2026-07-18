@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart' as api;
 import '../components/header_button.dart';
@@ -133,7 +134,7 @@ class _HomeState extends State<Home> with RouteAware {
   Widget _buildBody() {
     switch (_status) {
       case _Status.loading:
-        return const _ScreenMsg('Loading…');
+        return const _ScreenLoader();
       case _Status.error:
         return const _ScreenMsg('Failed to load. Check the network / API key.');
       case _Status.ready:
@@ -207,6 +208,23 @@ class _HomeState extends State<Home> with RouteAware {
 }
 
 enum _Status { loading, ready, error }
+
+/// Full-screen loading state: the classic Apple activity spinner, centred.
+/// [radius] is in design units — the app-wide DesignScaler upscales it to the
+/// TV's real resolution like the rest of the UI.
+class _ScreenLoader extends StatelessWidget {
+  const _ScreenLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height,
+      child: const Center(
+        child: CupertinoActivityIndicator(radius: 18, color: AppColors.muted),
+      ),
+    );
+  }
+}
 
 class _ScreenMsg extends StatelessWidget {
   final String text;
