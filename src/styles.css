@@ -944,7 +944,7 @@ body {
   align-items: center;
   gap: 18px;
   padding: 14px 20px;
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--surface);
   color: var(--text);
   transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
@@ -994,6 +994,15 @@ body {
 }
 .lib-row--focused .lib-badge {
   background: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.62);
+}
+.lib-row__size {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lib-row--focused .lib-row__size {
   color: rgba(0, 0, 0, 0.62);
 }
 .lib-row__chevron {

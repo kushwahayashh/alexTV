@@ -133,23 +133,14 @@ function Row({
         {isFolder ? <FolderIcon /> : <FileIcon />}
       </span>
       <span className="lib-row__name">{item.name}</span>
-      <span className="lib-row__meta">
-        {isFolder ? (
-          <span className="lib-badge">{item.itemCount} episodes</span>
-        ) : (
-          <>
-            {item.resolution && (
-              <span className="lib-badge">{item.resolution}</span>
-            )}
-            {item.sizeFormatted && (
-              <span className="lib-badge">{item.sizeFormatted}</span>
-            )}
-          </>
-        )}
-      </span>
-      {isFolder && (
-        <span className="lib-row__chevron" aria-hidden>
-          ›
+      {!isFolder && (
+        <span className="lib-row__meta">
+          {item.resolution && (
+            <span className="lib-badge">{item.resolution}</span>
+          )}
+          {item.sizeFormatted && (
+            <span className="lib-row__size">{item.sizeFormatted}</span>
+          )}
         </span>
       )}
     </div>

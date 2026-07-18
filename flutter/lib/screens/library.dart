@@ -380,7 +380,6 @@ class _LibraryRowState extends State<_LibraryRow> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: focused ? AppColors.focus : AppColors.surface,
-            borderRadius: BorderRadius.circular(AppSizes.radius),
           ),
           child: Row(
             children: [
@@ -404,18 +403,6 @@ class _LibraryRowState extends State<_LibraryRow> {
               ),
               const SizedBox(width: 12),
               ..._badges(focused, metaColor),
-              if (_isFolder) ...[
-                const SizedBox(width: 12),
-                Text(
-                  '›',
-                  style: TextStyle(
-                    color: focused
-                        ? const Color(0x66000000)
-                        : const Color(0x4DFFFFFF),
-                    fontSize: 22,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -424,20 +411,15 @@ class _LibraryRowState extends State<_LibraryRow> {
   }
 
   List<Widget> _badges(bool focused, Color textColor) {
-    final labels = <String>[];
-    switch (widget.item) {
-      case FolderItem(:final folder):
-        labels.add('${folder.itemCount} episodes');
-      case FileItem(:final file):
-        if (file.resolution != null) labels.add(file.resolution!);
-        if (file.sizeFormatted != null) labels.add(file.sizeFormatted!);
-    }
-    final bg = focused
-        ? const Color(0x1F000000)
-        : Colors.white.withValues(alpha: 0.08);
+    // Folders carry no meta; files show a resolution pill + plain-text size.
+    if (widget.item is! FileItem) return const [];
+    final file = (widget.item as FileItem).file;
+
     final out = <Widget>[];
-    for (var i = 0; i < labels.length; i++) {
-      if (i > 0) out.add(const SizedBox(width: 8));
+    if (file.resolution != null) {
+      final bg = focused
+          ? const Color(0x1F000000)
+          : Colors.white.withValues(alpha: 0.08);
       out.add(
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -446,12 +428,25 @@ class _LibraryRowState extends State<_LibraryRow> {
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
-            labels[i],
+            file.resolution!,
             style: TextStyle(
               color: textColor,
               fontSize: 13.1,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ),
+      );
+    }
+    if (file.sizeFormatted != null) {
+      if (out.isNotEmpty) out.add(const SizedBox(width: 8));
+      out.add(
+        Text(
+          file.sizeFormatted!,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 14.4,
+            fontWeight: FontWeight.w600,
           ),
         ),
       );
