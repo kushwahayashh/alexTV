@@ -581,6 +581,20 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* A fixed backdrop blur snaps to full strength the instant the overlay
+     mounts, so the blur "pops" while the dim tint is still arriving. Ramp the
+     blur and tint together over 260ms easeOut so the entrance stays smooth. */
+  animation: player-overlay-in 260ms ease-out;
+}
+@keyframes player-overlay-in {
+  from {
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
+  }
+  to {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+  }
 }
 .player-modal {
   background: rgba(255, 255, 255, 0.22);

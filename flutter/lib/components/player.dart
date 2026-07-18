@@ -170,10 +170,21 @@ class _PlayerState extends State<Player> {
             onKeyEvent: (_, event) => _focus.handleKey(event, _handleBack, null),
             child: Stack(
               children: [
-                // Dim + blur overlay.
+                // Dim + blur overlay. The route's FadeTransition only animates
+                // opacity, but a BackdropFilter blurs at full strength the
+                // instant it composites, so the blur would "pop" while the dim
+                // tint eased in. Ramp the sigma from 0 → 8 over the same window
+                // as the route fade (260ms easeOut) so blur and tint arrive
+                // together and the entrance stays smooth.
                 Positioned.fill(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 8),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOut,
+                    builder: (context, sigma, child) => BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                      child: child,
+                    ),
                     child: Container(color: Colors.black.withValues(alpha: 0.6)),
                   ),
                 ),
