@@ -225,11 +225,12 @@ class _LibraryBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (status == _Status.loading) {
-      // Fill the viewport below the header (top padding + header row + gap ≈ 84
-      // design units) and centre in it, so the spinner lands mid-screen like
-      // Home's loader instead of a fixed offset from the top.
+      // The body starts ~84 design units below the top (top padding + header
+      // row + gap). To land the spinner at true screen centre we subtract that
+      // offset twice: the box centre is at offset + (height-2*offset)/2 =
+      // height/2.
       return SizedBox(
-        height: MediaQuery.of(context).size.height - 84,
+        height: MediaQuery.of(context).size.height - 168,
         child: const Center(
           child: CupertinoActivityIndicator(radius: 18, color: AppColors.muted),
         ),

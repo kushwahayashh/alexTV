@@ -547,6 +547,7 @@ private fun PlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var initialized by remember { mutableStateOf(false) }
+    var buffering by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
@@ -581,6 +582,9 @@ private fun PlayerScreen(
                     initialized = true
                     duration = player.duration.coerceAtLeast(0L)
                 }
+                // Re-buffering mid-playback (once past the initial load) shows
+                // the same spinner over the controls.
+                buffering = state == Player.STATE_BUFFERING
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -716,6 +720,14 @@ private fun PlayerScreen(
                             menuKind = kind
                         },
                     )
+
+                    // Mid-playback re-buffering: same spinner, centred over the
+                    // video on top of the controls.
+                    if (buffering) {
+                        AppleSpinner(
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
                 }
             }
 
