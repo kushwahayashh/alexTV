@@ -120,6 +120,12 @@ class _SearchState extends State<Search> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    // Pin to the top so the pill buttons stay at y=24 like
+                    // Home's navbar. The search field is taller than the pills,
+                    // so centering (the Row default) would nudge the buttons
+                    // down a few px and read as a jitter during the cross-fade
+                    // transition from Home.
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisSize: MainAxisSize.min,
