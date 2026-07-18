@@ -11,6 +11,11 @@ void main() {
   runApp(const AlexTvApp());
 }
 
+/// Single route observer shared across the Navigator. Screens that need to
+/// react to being covered/uncovered (e.g. Home pausing its hero rotation when
+/// Details/Search are pushed) subscribe to this via [RouteAware].
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 class AlexTvApp extends StatelessWidget {
   const AlexTvApp({super.key});
 
@@ -33,6 +38,7 @@ class AlexTvApp extends StatelessWidget {
       // pushed routes — Details, Search, Player — are scaled to the design
       // canvas too. Wrapping only `home` would leave them oversized on TV.
       builder: (context, child) => _DesignScaler(child: child!),
+      navigatorObservers: [routeObserver],
       home: const Home(),
     );
   }

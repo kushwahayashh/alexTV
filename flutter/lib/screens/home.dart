@@ -6,7 +6,7 @@ import '../components/hero.dart' as ui;
 import '../components/rail.dart';
 import '../components/update_button.dart';
 import '../focus/focus_engine.dart';
-import '../main.dart' show openDetails, openSearch;
+import '../main.dart' show openDetails, openSearch, routeObserver;
 import '../theme.dart';
 
 const _heroRotateMs = 10000;
@@ -18,7 +18,7 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> {
+class _HomeState extends State<Home> with RouteAware {
   final _focus = FocusController();
   final _pageController = ScrollController();
   final _keyboardNode = FocusNode();
@@ -33,6 +33,15 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe once the route is available (can't in initState — ModalRoute
+    // needs a context that has access to the Navigator). Re-subscribing is
+    // idempotent; routeObserver dedupes the subscription.
+    routeObserver.subscribe(this, ModalRoute.of(context)! as PageRoute);
   }
 
   Future<void> _load() async {
@@ -65,6 +74,21 @@ class _HomeState extends State<Home> {
     );
   }
 
+  void _stopRotation() {
+    _rotateTimer?.cancel();
+    _rotateTimer = null;
+  }
+
+  // RouteAware: pause the hero timer while another route (Details, Search,
+  // Player) is on top of Home. Home stays mounted underneath, so without this
+  // the timer keeps firing setState + remounting FadeImage, loading more
+  // original-size backdrops into the image cache while the user can't see it.
+  @override
+  void didPushNext() => _stopRotation();
+
+  @override
+  void didPopNext() => _startRotation();
+
   void _releaseToTop() {
     if (_pageController.hasClients) {
       _pageController.animateTo(
@@ -77,7 +101,8 @@ class _HomeState extends State<Home> {
 
   @override
   void dispose() {
-    _rotateTimer?.cancel();
+    routeObserver.unsubscribe(this);
+    _stopRotation();
     _pageController.dispose();
     _keyboardNode.dispose();
     _focus.dispose();
