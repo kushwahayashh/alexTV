@@ -928,7 +928,12 @@ class _EpisodeRowState extends State<_EpisodeRow> {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
-            color: focused ? AppColors.focus : AppColors.surface,
+            // Neutral translucent white over the dark bg — same black/white
+            // family as the Play button (HeaderButton), not the --surface
+            // token. Mirrors the React .ep-row background.
+            color: focused
+                ? AppColors.focus
+                : Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(AppSizes.radius),
           ),
           child: Row(
