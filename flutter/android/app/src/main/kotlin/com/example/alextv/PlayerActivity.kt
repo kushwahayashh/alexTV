@@ -11,8 +11,13 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +43,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +70,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -106,6 +111,58 @@ private val BgColor = Color(0xFF08080A)
 private val TextColor = Color(0xFFF2F5F8)
 private val MutedColor = Color(0xFF8B8B94)
 private val FocusColor = Color(0xFFFFFFFF)
+
+/* ---------- Apple-style activity spinner ----------
+ * Ring of 12 tapered spokes; the whole ring steps around in 12 discrete jumps
+ * so the bright leader hands off spoke-to-spoke with a trailing fade — the
+ * classic Cupertino look. Ported 1:1 from the web prototype's Spinner.tsx /
+ * Flutter's CupertinoActivityIndicator so every surface shows the same loader.
+ */
+private const val SPINNER_SPOKES = 12
+
+@Composable
+private fun AppleSpinner(
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 36.dp,
+    color: Color = MutedColor,
+) {
+    val transition = rememberInfiniteTransition(label = "spinner")
+    // Stepped rotation: 12 discrete jumps per second (matches CSS steps(12)).
+    val step by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = SPINNER_SPOKES.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+        ),
+        label = "step",
+    )
+    Canvas(modifier = modifier.size(size)) {
+        val leader = step.toInt() % SPINNER_SPOKES
+        val cx = this.size.width / 2f
+        val cy = this.size.height / 2f
+        val spokeW = this.size.width * 0.08f
+        val spokeLen = this.size.height * 0.26f
+        val radius = this.size.width / 2f - spokeLen / 2f
+        for (i in 0 until SPINNER_SPOKES) {
+            // Trailing fade: the leader is brightest, each older spoke dimmer.
+            val dist = ((leader - i) + SPINNER_SPOKES) % SPINNER_SPOKES
+            val alpha = (SPINNER_SPOKES - dist).toFloat() / SPINNER_SPOKES
+            val angle = Math.toRadians((i * (360.0 / SPINNER_SPOKES)) - 90.0)
+            val ex = cx + (radius * Math.cos(angle)).toFloat()
+            val ey = cy + (radius * Math.sin(angle)).toFloat()
+            val half = spokeLen / 2f
+            val ux = Math.cos(angle).toFloat()
+            val uy = Math.sin(angle).toFloat()
+            drawLine(
+                color = color.copy(alpha = alpha),
+                start = Offset(ex - ux * half, ey - uy * half),
+                end = Offset(ex + ux * half, ey + uy * half),
+                strokeWidth = spokeW,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
 
 // Varela Round, bundled at res/font/varela_round.ttf. Applied to every Text so
 // typography matches the old Flutter/Dart player exactly.
@@ -638,8 +695,7 @@ private fun PlayerScreen(
             when {
                 errorText != null -> ErrorView(errorText!!)
 
-                !initialized -> CircularProgressIndicator(
-                    color = TextColor,
+                !initialized -> AppleSpinner(
                     modifier = Modifier.align(Alignment.Center),
                 )
 
