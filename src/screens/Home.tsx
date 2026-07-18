@@ -3,6 +3,7 @@ import { fetchHomeRails, type Media, type Rail as RailData } from '../api/tmdb'
 import { Hero } from '../components/Hero'
 import { Rail } from '../components/Rail'
 import { HeaderButton } from '../components/HeaderButton'
+import { Spinner } from '../components/Spinner'
 
 const HERO_ROTATE_MS = 10000
 
@@ -49,7 +50,11 @@ export function Home({
   }, [featured])
 
   if (status === 'loading') {
-    return <div className="screen-msg">Loading…</div>
+    return (
+      <div className="screen-msg screen-msg--loader">
+        <Spinner />
+      </div>
+    )
   }
   if (status === 'error') {
     return <div className="screen-msg">Failed to load. Check the network / API key.</div>

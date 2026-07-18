@@ -1,8 +1,8 @@
 :root {
-  --bg: #08080a;
-  --surface: #16161a;
-  --text: #f2f5f8;
-  --muted: #8b8b94;
+  --bg: #090909;
+  --surface: #171717;
+  --text: #f4f4f5;
+  --muted: #8b8b8b;
   --accent: #e50914;
   --focus: #ffffff;
   --radius: 10px;
@@ -32,6 +32,35 @@ body {
   height: 100vh;
   color: var(--muted);
   font-size: 1.25rem;
+}
+
+/* ---------- Apple-style activity spinner ---------- */
+/* Ring of 12 tapered spokes; the whole ring steps around in 12 discrete jumps
+   so the bright leader hands off spoke-to-spoke with a trailing fade — the
+   classic Cupertino look (matches Flutter's CupertinoActivityIndicator). */
+.screen-msg--loader {
+  color: inherit;
+}
+.spinner {
+  position: relative;
+  display: inline-block;
+  animation: spinnerRotate 1s steps(12) infinite;
+}
+.spinner__spoke {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 8%;
+  height: 26%;
+  margin-left: -4%;
+  border-radius: 999px;
+  background: var(--muted);
+  transform-origin: center 192%; /* pivot at the ring centre */
+}
+@keyframes spinnerRotate {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ---------- Home layout ---------- */
@@ -112,7 +141,7 @@ body {
   overflow: hidden;
 }
 .hero--empty {
-  background: linear-gradient(180deg, #16161a, var(--bg));
+  background: linear-gradient(180deg, var(--surface), var(--bg));
 }
 .hero__bg {
   position: absolute;
@@ -134,7 +163,7 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(11, 15, 20, 0.95) 0%, rgba(11, 15, 20, 0.4) 55%, transparent 100%),
+    linear-gradient(90deg, rgba(13, 13, 13, 0.95) 0%, rgba(13, 13, 13, 0.4) 55%, transparent 100%),
     linear-gradient(0deg, var(--bg) 2%, transparent 45%);
 }
 .hero__content {
@@ -267,12 +296,12 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(8, 8, 10, 0.95) 0%, rgba(8, 8, 10, 0.4) 55%, transparent 100%),
+    linear-gradient(90deg, rgba(9, 9, 9, 0.95) 0%, rgba(9, 9, 9, 0.4) 55%, transparent 100%),
     linear-gradient(
       0deg,
       var(--bg) 0%,
-      rgba(8, 8, 10, 0.85) 12%,
-      rgba(8, 8, 10, 0.35) 30%,
+      rgba(9, 9, 9, 0.85) 12%,
+      rgba(9, 9, 9, 0.35) 30%,
       transparent 55%
     );
 }
@@ -423,7 +452,9 @@ body {
   padding: 12px 20px;
   border: none;
   border-radius: var(--radius);
-  background: var(--surface);
+  /* Neutral translucent white over the dark bg — same black/white family as
+     the Play button (.header-btn), not the blue-tinted --surface token. */
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text);
   font-family: inherit;
   text-align: left;
