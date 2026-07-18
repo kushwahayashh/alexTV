@@ -2,12 +2,17 @@ import { useCallback, useRef, useState } from 'react'
 import { FocusProvider, type FocusApi } from './focus/FocusEngine'
 import { Home } from './screens/Home'
 import { Search } from './screens/Search'
+import { Library } from './screens/Library'
 import { Details } from './screens/Details'
 import type { Media } from './api/tmdb'
+import type { LibraryFile } from './api/library'
 
 export default function App() {
   const [selected, setSelected] = useState<Media | null>(null)
   const [showSearch, setShowSearch] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
+  // Folder ids from the library root down to the current level. Empty = root.
+  const [libraryPath, setLibraryPath] = useState<string[]>([])
   // Imperative handle into the focus engine, populated by FocusProvider.
   const focusApi = useRef<FocusApi | null>(null)
   // The card/button focused before we pushed the next screen, so Back can
@@ -15,6 +20,7 @@ export default function App() {
   // per layer: search remembers the Home button, details remembers the card
   // (on Home or in Search) it was opened from.
   const searchReturnFocus = useRef<string | null>(null)
+  const libraryReturnFocus = useRef<string | null>(null)
   const detailsReturnFocus = useRef<string | null>(null)
 
   // Open Details from whichever screen is on top; remember the focused item.
@@ -47,11 +53,55 @@ export default function App() {
     if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
   }, [])
 
-  // Back button routes to the topmost layer: Details → Search → Home.
+  // Open Library from Home; remember the focused Home button and start at root.
+  const handleOpenLibrary = useCallback(() => {
+    libraryReturnFocus.current = focusApi.current?.getFocusId() ?? null
+    setLibraryPath([])
+    setShowLibrary(true)
+  }, [])
+
+  // Fully close Library and restore the button that opened it (Home button).
+  const handleExitLibrary = useCallback(() => {
+    setShowLibrary(false)
+    setLibraryPath([])
+    const saved = libraryReturnFocus.current
+    if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
+  }, [])
+
+  // Back from Library: pop into the current folder's parent if we're drilled
+  // in, otherwise close the screen and restore the button that opened it.
+  const handleCloseLibrary = useCallback(() => {
+    setLibraryPath((stack) => {
+      if (stack.length > 0) return stack.slice(0, -1)
+      setShowLibrary(false)
+      const saved = libraryReturnFocus.current
+      if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
+      return stack
+    })
+  }, [])
+
+  const handleOpenFolder = useCallback((folderId: string) => {
+    setLibraryPath((stack) => [...stack, folderId])
+  }, [])
+
+  const handlePlayFile = useCallback((file: LibraryFile) => {
+    // Player wiring lands later; for now just surface the pick.
+    console.log('play library file', file.name)
+  }, [])
+
+  // Back button routes to the topmost layer: Details → Search/Library → Home.
   const handleBack = useCallback(() => {
     if (selected) handleCloseDetails()
+    else if (showLibrary) handleCloseLibrary()
     else if (showSearch) handleCloseSearch()
-  }, [selected, showSearch, handleCloseDetails, handleCloseSearch])
+  }, [
+    selected,
+    showLibrary,
+    showSearch,
+    handleCloseDetails,
+    handleCloseLibrary,
+    handleCloseSearch,
+  ])
 
   return (
     <FocusProvider onBack={handleBack} apiRef={focusApi}>
@@ -59,14 +109,33 @@ export default function App() {
           card all survive a round-trip into Search/Details — it's only hidden
           while a screen is on top. display:contents keeps it layout-transparent
           when visible (as if this wrapper weren't here). */}
-      <div style={{ display: selected || showSearch ? 'none' : 'contents' }}>
-        <Home onSelect={handleSelect} onOpenSearch={handleOpenSearch} />
+      <div
+        style={{
+          display:
+            selected || showSearch || showLibrary ? 'none' : 'contents',
+        }}
+      >
+        <Home
+          onSelect={handleSelect}
+          onOpenSearch={handleOpenSearch}
+          onOpenLibrary={handleOpenLibrary}
+        />
       </div>
       {/* Search likewise stays mounted (hidden) under Details so Back from a
           result returns to the same query and grid position. */}
       {showSearch && (
         <div style={{ display: selected ? 'none' : 'contents' }}>
           <Search onSelect={handleSelect} onGoHome={handleCloseSearch} />
+        </div>
+      )}
+      {showLibrary && (
+        <div style={{ display: selected ? 'none' : 'contents' }}>
+          <Library
+            path={libraryPath}
+            onGoHome={handleExitLibrary}
+            onOpenFolder={handleOpenFolder}
+            onPlayFile={handlePlayFile}
+          />
         </div>
       )}
       {selected && <Details media={selected} />}

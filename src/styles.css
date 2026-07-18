@@ -879,3 +879,119 @@ body {
   color: rgba(255, 255, 255, 0.7);
   margin: 0 0 16px;
 }
+
+/* ---------- Library (file manager) ---------- */
+.library {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px 48px 64px;
+  /* Keep the nav + breadcrumb in view when a focused row lifts up. */
+  scroll-padding-top: 150px;
+  scrollbar-width: none;
+}
+.library::-webkit-scrollbar {
+  display: none;
+}
+.library__topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.library__nav {
+  display: flex;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.library__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  color: var(--muted);
+}
+.library__crumb-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.library__crumb-sep {
+  color: rgba(255, 255, 255, 0.28);
+}
+/* The deepest crumb (last one rendered) is the current location. */
+.library__crumb-part:last-child .library__crumb {
+  color: var(--text);
+  font-weight: 700;
+}
+.library__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.lib-row--focused {
+  background: var(--focus);
+  color: var(--bg);
+  transform: scale(1.015);
+}
+.lib-row__icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.lib-row--focused .lib-row__icon {
+  color: var(--bg);
+}
+.lib-row__icon svg {
+  width: 24px;
+  height: 24px;
+}
+.lib-row__name {
+  flex: 1 1 auto;
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lib-row__meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lib-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lib-row--focused .lib-badge {
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.62);
+}
+.lib-row__chevron {
+  flex: 0 0 auto;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.3);
+}
+.lib-row--focused .lib-row__chevron {
+  color: rgba(0, 0, 0, 0.4);
+}

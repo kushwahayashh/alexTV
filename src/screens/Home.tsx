@@ -10,9 +10,11 @@ const HERO_ROTATE_MS = 10000
 export function Home({
   onSelect,
   onOpenSearch,
+  onOpenLibrary,
 }: {
   onSelect: (m: Media) => void
   onOpenSearch: () => void
+  onOpenLibrary: () => void
 }) {
   const [rails, setRails] = useState<RailData[]>([])
   const [featured, setFeatured] = useState<Media[]>([])
@@ -67,7 +69,7 @@ export function Home({
         <div className="home__header home__header--left">
           <HeaderButton label="Home" />
           <HeaderButton label="Search" onSelect={onOpenSearch} />
-          <HeaderButton label="Library" />
+          <HeaderButton label="Library" onSelect={onOpenLibrary} />
         </div>
         <div className="home__header home__header--right">
           <HeaderButton label="Update" />
