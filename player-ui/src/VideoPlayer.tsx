@@ -32,6 +32,14 @@ type MenuKind = 'audio' | 'subtitles'
 // app's quality picker in src/components/Player.tsx.
 type Track = { id: string; label: string; meta: string }
 
+// Placeholder rows matching the Compose PlayerActivity structure:
+//  - OFF: first row of ORG subs, index 0, default-selected (no subtitles).
+//  - NONE: shown in WebSubs when there are no sideloaded web subs.
+//  - DEFAULT_AUDIO: shown in Audio when ExoPlayer parsed no audio tracks.
+const OFF_TRACK: Track = { id: 'sub-off', label: 'Off', meta: '' }
+const NONE_TRACK: Track = { id: 'web-none', label: 'None', meta: '' }
+const DEFAULT_AUDIO_TRACK: Track = { id: 'audio-none', label: 'Default', meta: '' }
+
 const AUDIO_TRACKS: Track[] = [
   { id: 'en-51', label: 'English', meta: '5.1 · AC3' },
   { id: 'en-stereo', label: 'English', meta: 'Stereo · AAC' },
@@ -45,26 +53,37 @@ const SUBTITLE_ORG: Track[] = [
 ]
 
 const SUBTITLE_WEB: Track[] = [
-  { id: 'web-en', label: 'English', meta: 'SRT' },
-  { id: 'web-es', label: 'Spanish', meta: 'SRT' },
-  { id: 'web-fr', label: 'French', meta: 'SRT' },
-  { id: 'web-de', label: 'German', meta: 'SRT' },
-  { id: 'web-it', label: 'Italian', meta: 'SRT' },
-  { id: 'web-pt', label: 'Portuguese', meta: 'SRT' },
-  { id: 'web-ja', label: 'Japanese', meta: 'SRT' },
-  { id: 'web-ko', label: 'Korean', meta: 'SRT' },
-  { id: 'web-ar', label: 'Arabic', meta: 'SRT' },
+  { id: 'web-en', label: 'English', meta: 'Web' },
+  { id: 'web-es', label: 'Spanish', meta: 'Web' },
+  { id: 'web-fr', label: 'French', meta: 'Web' },
+  { id: 'web-de', label: 'German', meta: 'Web' },
+  { id: 'web-it', label: 'Italian', meta: 'Web' },
+  { id: 'web-pt', label: 'Portuguese', meta: 'Web' },
+  { id: 'web-ja', label: 'Japanese', meta: 'Web' },
+  { id: 'web-ko', label: 'Korean', meta: 'Web' },
+  { id: 'web-ar', label: 'Arabic', meta: 'Web' },
 ]
 
 // Per-menu config: a list of sections (each with its own heading). D-pad
 // navigation flows through every section as one continuous index; the headings
-// only divide the list visually. Audio is a single unlabelled-count section.
+// only divide the list visually. Structure mirrors the Compose PlayerActivity:
+//  - Audio: single section, "Default" placeholder if no tracks.
+//  - Subtitles: ORG subs = "Off" + embedded tracks; WebSubs = web tracks or
+//    "None" placeholder if empty.
 type MenuSection = { heading: string; tracks: Track[] }
 const MENUS: Record<MenuKind, MenuSection[]> = {
-  audio: [{ heading: 'Audio Tracks', tracks: AUDIO_TRACKS }],
+  audio: [
+    {
+      heading: 'Audio Tracks',
+      tracks: AUDIO_TRACKS.length ? AUDIO_TRACKS : [DEFAULT_AUDIO_TRACK],
+    },
+  ],
   subtitles: [
-    { heading: 'ORG subs', tracks: SUBTITLE_ORG },
-    { heading: 'WebSubs', tracks: SUBTITLE_WEB },
+    { heading: 'ORG subs', tracks: [OFF_TRACK, ...SUBTITLE_ORG] },
+    {
+      heading: 'WebSubs',
+      tracks: SUBTITLE_WEB.length ? SUBTITLE_WEB : [NONE_TRACK],
+    },
   ],
 }
 
