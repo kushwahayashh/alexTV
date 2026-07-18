@@ -1,18 +1,21 @@
+import { useEffect, useState } from 'react'
 import { useFocusable } from '../focus/FocusEngine'
 import { HeaderButton } from '../components/HeaderButton'
+import { Spinner } from '../components/Spinner'
 import {
-  itemsAtPath,
+  fetchLibrary,
   type LibraryFile,
-  type LibraryFolder,
   type LibraryItem,
+  type LibraryListing,
 } from '../api/library'
 
+type Status = 'loading' | 'ready' | 'error'
+
 /**
- * File-manager style library. Browses the mock library tree (see
- * `api/library.ts`): the root lists movie files and series folders, opening a
- * folder drills into its episodes. The folder stack lives in App so the global
- * Back button can pop a level before closing the whole screen; this component
- * just renders the current level and reports folder-opens / file-picks up.
+ * File-manager style library, backed by the AlexTV Library backend. The current
+ * path lives in App so the global Back button can climb folders before closing
+ * the whole screen; this component fetches and renders the level at that path
+ * and reports folder-opens / file-picks up.
  */
 export function Library({
   path,
@@ -20,12 +23,31 @@ export function Library({
   onOpenFolder,
   onPlayFile,
 }: {
-  path: string[]
+  path: string
   onGoHome: () => void
-  onOpenFolder: (folderId: string) => void
+  onOpenFolder: (folderPath: string) => void
   onPlayFile: (file: LibraryFile) => void
 }) {
-  const items = itemsAtPath(path)
+  const [listing, setListing] = useState<LibraryListing | null>(null)
+  const [status, setStatus] = useState<Status>('loading')
+
+  useEffect(() => {
+    let alive = true
+    setStatus('loading')
+    fetchLibrary(path)
+      .then((data) => {
+        if (!alive) return
+        setListing(data)
+        setStatus('ready')
+      })
+      .catch((err) => {
+        console.error(err)
+        if (alive) setStatus('error')
+      })
+    return () => {
+      alive = false
+    }
+  }, [path])
 
   return (
     <div className="library">
@@ -39,34 +61,36 @@ export function Library({
 
       <Breadcrumb path={path} />
 
-      <div className="library__list">
-        {items.map((item) => (
-          <Row
-            key={item.id}
-            item={item}
-            onOpenFolder={onOpenFolder}
-            onPlayFile={onPlayFile}
-          />
-        ))}
-      </div>
+      {status === 'loading' && (
+        <div className="library__msg library__msg--loader">
+          <Spinner />
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="library__msg">Failed to load the library.</div>
+      )}
+      {status === 'ready' && listing && listing.items.length === 0 && (
+        <div className="library__msg">This folder is empty.</div>
+      )}
+      {status === 'ready' && listing && listing.items.length > 0 && (
+        <div className="library__list">
+          {listing.items.map((item) => (
+            <Row
+              key={item.path}
+              item={item}
+              onOpenFolder={onOpenFolder}
+              onPlayFile={onPlayFile}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-/** Current location as "Library / Folder / Subfolder". */
-function Breadcrumb({ path }: { path: string[] }) {
-  // Walk the tree once to turn folder ids into names.
-  const names: string[] = []
-  let level: LibraryItem[] = itemsAtPath([])
-  for (const id of path) {
-    const folder = level.find(
-      (it) => it.id === id && it.type === 'folder',
-    ) as LibraryFolder | undefined
-    if (!folder) break
-    names.push(folder.name)
-    level = folder.children
-  }
-
+/** Current location as the folder path below the root ("Breaking Bad / S01"). */
+function Breadcrumb({ path }: { path: string }) {
+  const names = path.split('/').filter(Boolean)
   // At the root there's nothing to show — we already know we're in the Library.
   if (names.length === 0) return null
 
@@ -88,14 +112,14 @@ function Row({
   onPlayFile,
 }: {
   item: LibraryItem
-  onOpenFolder: (folderId: string) => void
+  onOpenFolder: (folderPath: string) => void
   onPlayFile: (file: LibraryFile) => void
 }) {
   const isFolder = item.type === 'folder'
   const { ref, focused } = useFocusable({
     scrollMode: 'nearest',
     onSelect: () => {
-      if (isFolder) onOpenFolder(item.id)
+      if (isFolder) onOpenFolder(item.path)
       else onPlayFile(item)
     },
   })
@@ -111,13 +135,15 @@ function Row({
       <span className="lib-row__name">{item.name}</span>
       <span className="lib-row__meta">
         {isFolder ? (
-          <span className="lib-badge">{item.children.length} episodes</span>
+          <span className="lib-badge">{item.itemCount} episodes</span>
         ) : (
           <>
             {item.resolution && (
               <span className="lib-badge">{item.resolution}</span>
             )}
-            {item.size && <span className="lib-badge">{item.size}</span>}
+            {item.sizeFormatted && (
+              <span className="lib-badge">{item.sizeFormatted}</span>
+            )}
           </>
         )}
       </span>

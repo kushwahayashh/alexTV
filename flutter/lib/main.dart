@@ -4,6 +4,7 @@ import 'api/tmdb.dart' as api;
 import 'routes.dart';
 import 'screens/home.dart';
 import 'screens/search.dart';
+import 'screens/library.dart';
 import 'screens/details.dart';
 import 'theme.dart';
 
@@ -56,6 +57,12 @@ void openDetails(BuildContext context, api.Media media) {
 /// top, so Back from Details returns to Search, then Back again to Home.
 void openSearch(BuildContext context) {
   Navigator.of(context).push(fadeRoute(const Search()));
+}
+
+/// Pushes the Library (file-manager) screen. Drilling into folders happens
+/// within the screen; Back climbs folders before popping back to Home.
+void openLibrary(BuildContext context) {
+  Navigator.of(context).push(fadeRoute(const Library()));
 }
 
 /// Lays the app out at a fixed [AppSizes.designWidth] and uniformly scales it

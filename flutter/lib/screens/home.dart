@@ -7,7 +7,7 @@ import '../components/hero.dart' as ui;
 import '../components/rail.dart';
 import '../components/update_button.dart';
 import '../focus/focus_engine.dart';
-import '../main.dart' show openDetails, openSearch, routeObserver;
+import '../main.dart' show openDetails, openSearch, openLibrary, routeObserver;
 import '../theme.dart';
 
 const _heroRotateMs = 10000;
@@ -169,6 +169,7 @@ class _HomeState extends State<Home> with RouteAware {
                         HeaderButton(
                           label: 'Library',
                           onFocused: _releaseToTop,
+                          onSelect: () => openLibrary(context),
                         ),
                       ],
                     ),

@@ -5,14 +5,14 @@ import { Search } from './screens/Search'
 import { Library } from './screens/Library'
 import { Details } from './screens/Details'
 import type { Media } from './api/tmdb'
-import type { LibraryFile } from './api/library'
+import { parentOf, type LibraryFile } from './api/library'
 
 export default function App() {
   const [selected, setSelected] = useState<Media | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
-  // Folder ids from the library root down to the current level. Empty = root.
-  const [libraryPath, setLibraryPath] = useState<string[]>([])
+  // Backend path of the current library level; "/" is the root.
+  const [libraryPath, setLibraryPath] = useState('/')
   // Imperative handle into the focus engine, populated by FocusProvider.
   const focusApi = useRef<FocusApi | null>(null)
   // The card/button focused before we pushed the next screen, so Back can
@@ -56,32 +56,32 @@ export default function App() {
   // Open Library from Home; remember the focused Home button and start at root.
   const handleOpenLibrary = useCallback(() => {
     libraryReturnFocus.current = focusApi.current?.getFocusId() ?? null
-    setLibraryPath([])
+    setLibraryPath('/')
     setShowLibrary(true)
   }, [])
 
   // Fully close Library and restore the button that opened it (Home button).
   const handleExitLibrary = useCallback(() => {
     setShowLibrary(false)
-    setLibraryPath([])
+    setLibraryPath('/')
     const saved = libraryReturnFocus.current
     if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
   }, [])
 
-  // Back from Library: pop into the current folder's parent if we're drilled
+  // Back from Library: climb into the current folder's parent if we're drilled
   // in, otherwise close the screen and restore the button that opened it.
   const handleCloseLibrary = useCallback(() => {
-    setLibraryPath((stack) => {
-      if (stack.length > 0) return stack.slice(0, -1)
+    setLibraryPath((cur) => {
+      if (cur !== '/') return parentOf(cur)
       setShowLibrary(false)
       const saved = libraryReturnFocus.current
       if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
-      return stack
+      return cur
     })
   }, [])
 
-  const handleOpenFolder = useCallback((folderId: string) => {
-    setLibraryPath((stack) => [...stack, folderId])
+  const handleOpenFolder = useCallback((folderPath: string) => {
+    setLibraryPath(folderPath)
   }, [])
 
   const handlePlayFile = useCallback((file: LibraryFile) => {

@@ -924,6 +924,16 @@ body {
   color: var(--text);
   font-weight: 700;
 }
+.library__msg {
+  display: grid;
+  place-items: center;
+  padding: 120px 0;
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+.library__msg--loader {
+  color: inherit;
+}
 .library__list {
   display: flex;
   flex-direction: column;

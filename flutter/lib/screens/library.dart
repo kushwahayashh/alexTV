@@ -1,0 +1,436 @@
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import '../api/library.dart';
+import '../components/header_button.dart';
+import '../focus/focus_engine.dart';
+import '../theme.dart';
+
+enum _Status { loading, ready, error }
+
+/// File-manager style library, backed by the AlexTV Library backend. The
+/// current path is held in state; the global Back button climbs into the
+/// parent folder if we're drilled in, otherwise it pops the screen. Selecting a
+/// folder drills into it; selecting a file will play it (wiring lands later).
+class Library extends StatefulWidget {
+  const Library({super.key});
+
+  @override
+  State<Library> createState() => _LibraryState();
+}
+
+class _LibraryState extends State<Library> {
+  final _focus = FocusController();
+  final _keyboardNode = FocusNode();
+  final _pageController = ScrollController();
+
+  /// Backend path of the current level; "/" is the root.
+  String _path = '/';
+  LibraryListing? _listing;
+  _Status _status = _Status.loading;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(_path);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _keyboardNode.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load(String path) async {
+    setState(() => _status = _Status.loading);
+    try {
+      final data = await fetchLibrary(path);
+      if (!mounted || path != _path) return;
+      setState(() {
+        _listing = data;
+        _status = _Status.ready;
+      });
+    } catch (e) {
+      debugPrint('$e');
+      if (!mounted || path != _path) return;
+      setState(() => _status = _Status.error);
+    }
+  }
+
+  void _openFolder(String folderPath) {
+    setState(() => _path = folderPath);
+    if (_pageController.hasClients) _pageController.jumpTo(0);
+    _load(folderPath);
+  }
+
+  void _playFile(LibraryFile file) {
+    // Player wiring lands later; for now just surface the pick.
+    debugPrint('play library file ${file.name}');
+  }
+
+  /// Back: climb into the parent folder if drilled in, otherwise pop the screen.
+  void _handleBack() {
+    if (_path != '/') {
+      _openFolder(parentOf(_path));
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
+    return _focus.handleKey(event, _handleBack, null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: FocusScopeProvider(
+        controller: _focus,
+        child: Focus(
+          focusNode: _keyboardNode,
+          autofocus: true,
+          onKeyEvent: _handleKey,
+          child: SingleChildScrollView(
+            controller: _pageController,
+            physics: const ClampingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.pagePadding,
+                24,
+                AppSizes.pagePadding,
+                64,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      HeaderButton(
+                        label: 'Home',
+                        onSelect: () => Navigator.of(context).maybePop(),
+                      ),
+                      const SizedBox(width: 12),
+                      const HeaderButton(label: 'Search'),
+                      const SizedBox(width: 12),
+                      const HeaderButton(label: 'Library'),
+                    ],
+                  ),
+                  _Breadcrumb(path: _path),
+                  const SizedBox(height: 20),
+                  _LibraryBody(
+                    status: _status,
+                    listing: _listing,
+                    pageController: _pageController,
+                    onOpenFolder: _openFolder,
+                    onPlayFile: _playFile,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Current location as the folder path below the root ("Breaking Bad / S01").
+/// Empty at the root — we already know we're in the Library.
+class _Breadcrumb extends StatelessWidget {
+  final String path;
+  const _Breadcrumb({required this.path});
+
+  @override
+  Widget build(BuildContext context) {
+    final names = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (names.isEmpty) return const SizedBox.shrink();
+
+    final parts = <Widget>[];
+    for (var i = 0; i < names.length; i++) {
+      if (i > 0) {
+        parts.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '›',
+              style: TextStyle(color: Color(0x47FFFFFF), fontSize: 17.6),
+            ),
+          ),
+        );
+      }
+      final isLast = i == names.length - 1;
+      parts.add(
+        Text(
+          names[i],
+          style: TextStyle(
+            color: isLast ? AppColors.text : AppColors.muted,
+            fontSize: 17.6,
+            fontWeight: isLast ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Row(children: parts),
+    );
+  }
+}
+
+class _LibraryBody extends StatelessWidget {
+  final _Status status;
+  final LibraryListing? listing;
+  final ScrollController pageController;
+  final void Function(String) onOpenFolder;
+  final void Function(LibraryFile) onPlayFile;
+
+  const _LibraryBody({
+    required this.status,
+    required this.listing,
+    required this.pageController,
+    required this.onOpenFolder,
+    required this.onPlayFile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == _Status.loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 120),
+        child: Center(
+          child: CupertinoActivityIndicator(radius: 18, color: AppColors.muted),
+        ),
+      );
+    }
+    if (status == _Status.error) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 120),
+        child: Center(
+          child: Text(
+            'Failed to load the library.',
+            style: TextStyle(color: AppColors.muted, fontSize: 18.4),
+          ),
+        ),
+      );
+    }
+    final items = listing?.items ?? const [];
+    if (items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 120),
+        child: Center(
+          child: Text(
+            'This folder is empty.',
+            style: TextStyle(color: AppColors.muted, fontSize: 18.4),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _LibraryRow(
+              key: ValueKey(switch (item) {
+                FolderItem(:final folder) => folder.path,
+                FileItem(:final file) => file.path,
+              }),
+              item: item,
+              pageController: pageController,
+              onOpenFolder: onOpenFolder,
+              onPlayFile: onPlayFile,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _LibraryRow extends StatefulWidget {
+  final LibraryItem item;
+  final ScrollController pageController;
+  final void Function(String) onOpenFolder;
+  final void Function(LibraryFile) onPlayFile;
+
+  const _LibraryRow({
+    super.key,
+    required this.item,
+    required this.pageController,
+    required this.onOpenFolder,
+    required this.onPlayFile,
+  });
+
+  @override
+  State<_LibraryRow> createState() => _LibraryRowState();
+}
+
+class _LibraryRowState extends State<_LibraryRow> {
+  late FocusController _controller;
+  late int _id;
+  bool _registered = false;
+
+  bool get _isFolder => widget.item is FolderItem;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_registered) {
+      _controller = FocusScopeProvider.read(context);
+      _id = _controller.register(
+        onSelect: _select,
+        onFocused: _scrollIntoView,
+      );
+      _registered = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.unregister(_id);
+    super.dispose();
+  }
+
+  void _select() {
+    switch (widget.item) {
+      case FolderItem(:final folder):
+        widget.onOpenFolder(folder.path);
+      case FileItem(:final file):
+        widget.onPlayFile(file);
+    }
+  }
+
+  void _scrollIntoView() {
+    final ctx = _controller.keyOf(_id).currentContext;
+    if (ctx == null) return;
+    final box = ctx.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+
+    final viewport = RenderAbstractViewport.maybeOf(box);
+    final page = widget.pageController;
+    if (!page.hasClients || viewport == null) return;
+
+    final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
+    final target = (revealTop - 150).clamp(
+      page.position.minScrollExtent,
+      page.position.maxScrollExtent,
+    );
+    page.animateTo(
+      target,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = FocusScopeProvider.of(context);
+    final focused = controller.isFocused(_id);
+    final onColor = focused ? AppColors.bg : AppColors.text;
+    final metaColor = focused
+        ? const Color(0x9E000000)
+        : AppColors.muted;
+
+    final name = switch (widget.item) {
+      FolderItem(:final folder) => folder.name,
+      FileItem(:final file) => file.name,
+    };
+
+    return KeyedSubtree(
+      key: _controller.keyOf(_id),
+      child: GestureDetector(
+        onTap: _select,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          transformAlignment: Alignment.center,
+          transform: focused
+              ? (Matrix4.identity()..scaleByDouble(1.015, 1.015, 1.015, 1.0))
+              : Matrix4.identity(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            color: focused ? AppColors.focus : AppColors.surface,
+            borderRadius: BorderRadius.circular(AppSizes.radius),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _isFolder ? Icons.folder_rounded : Icons.web_asset,
+                size: 24,
+                color: focused ? AppColors.bg : AppColors.muted,
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: onColor,
+                    fontSize: 16.8,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ..._badges(focused, metaColor),
+              if (_isFolder) ...[
+                const SizedBox(width: 12),
+                Text(
+                  '›',
+                  style: TextStyle(
+                    color: focused
+                        ? const Color(0x66000000)
+                        : const Color(0x4DFFFFFF),
+                    fontSize: 22,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _badges(bool focused, Color textColor) {
+    final labels = <String>[];
+    switch (widget.item) {
+      case FolderItem(:final folder):
+        labels.add('${folder.itemCount} episodes');
+      case FileItem(:final file):
+        if (file.resolution != null) labels.add(file.resolution!);
+        if (file.sizeFormatted != null) labels.add(file.sizeFormatted!);
+    }
+    final bg = focused
+        ? const Color(0x1F000000)
+        : Colors.white.withValues(alpha: 0.08);
+    final out = <Widget>[];
+    for (var i = 0; i < labels.length; i++) {
+      if (i > 0) out.add(const SizedBox(width: 8));
+      out.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            labels[i],
+            style: TextStyle(
+              color: textColor,
+              fontSize: 13.1,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+    return out;
+  }
+}
