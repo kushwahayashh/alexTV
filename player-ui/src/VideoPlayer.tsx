@@ -21,8 +21,11 @@ import { useEffect, useRef, useState, useCallback } from 'react'
  * Controls auto-hide after 4s of inactivity; any key resurfaces them.
  */
 
-const SEEK_STEP = 10 // seconds per arrow press on the seekbar
+const SEEK_STEP = 10 // seconds per arrow press on the seekbar (base step)
 const HIDE_DELAY = 4000 // ms of inactivity before controls fade out
+// Max gap between key-repeat events still counted as "holding". Slower than
+// this resets the accel ramp so a fresh tap always starts at the base step.
+const ACCEL_WINDOW = 300 // ms
 
 type ControlId = 'seek' | 'subtitles' | 'audio'
 type MenuKind = 'audio' | 'subtitles'
@@ -140,6 +143,10 @@ export function VideoPlayer({
   menuIdxRef.current = menuIdx
   const selectedRef = useRef(selected)
   selectedRef.current = selected
+  // Snapshot of controls visibility, read at the top of onKey BEFORE the
+  // activity bump re-shows them — so Back can tell if they were hidden.
+  const controlsVisibleRef = useRef(controlsVisible)
+  controlsVisibleRef.current = controlsVisible
 
   // Refs for target-scroll: every rendered row, the scroll container, and the
   // direction of the last Up/Down move (so we can lead the scroll ahead of the
@@ -147,6 +154,14 @@ export function VideoPlayer({
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const modalRef = useRef<HTMLDivElement | null>(null)
   const menuDirRef = useRef(0) // -1 up, +1 down, 0 on open
+
+  // Accelerated seeking: while Left/Right is held on the seekbar, each repeat
+  // grows the step so a long hold covers ground fast. accelCount is the run of
+  // consecutive presses in one direction; accelDir is that direction (-1/+1);
+  // accelLast is the timestamp of the last press (to detect release/pause).
+  const accelCountRef = useRef(0)
+  const accelDirRef = useRef(0)
+  const accelLastRef = useRef(0)
 
   // Mock playback timer — advances position when playing.
   useEffect(() => {
@@ -208,6 +223,27 @@ export function VideoPlayer({
     [duration],
   )
 
+  // Compute one accelerated seek step for a Left/Right press. A fresh tap (or a
+  // direction change, or a press after the accel window lapses) starts at the
+  // base step; holding the key ramps the step up in tiers the longer it's held.
+  const accelSeek = useCallback(
+    (dir: -1 | 1) => {
+      const now = Date.now()
+      const held =
+        accelDirRef.current === dir && now - accelLastRef.current <= ACCEL_WINDOW
+      accelCountRef.current = held ? accelCountRef.current + 1 : 0
+      accelDirRef.current = dir
+      accelLastRef.current = now
+
+      // Tiered multiplier by how long the key has been held. Gentle ramp:
+      // stays at the base step for a while, then eases up.
+      const c = accelCountRef.current
+      const mult = c < 8 ? 1 : c < 18 ? 2 : c < 30 ? 3 : 4
+      seekBy(dir * SEEK_STEP * mult)
+    },
+    [seekBy],
+  )
+
   // Single stable keyboard listener — reads from refs.
   useEffect(() => {
     function findInRow(dir: 'left' | 'right'): ControlId | null {
@@ -251,6 +287,8 @@ export function VideoPlayer({
     }
 
     function onKey(e: KeyboardEvent) {
+      // Read visibility before the bump re-shows the controls.
+      const wasVisible = controlsVisibleRef.current
       bumpActivity()
 
       // ---- A menu is open: it captures all navigation ----
@@ -290,7 +328,7 @@ export function VideoPlayer({
         case 'ArrowLeft':
           e.preventDefault()
           if (cur === 'seek') {
-            seekBy(-SEEK_STEP)
+            accelSeek(-1)
           } else {
             const n = findInRow('left')
             if (n) setFocused(n)
@@ -299,7 +337,7 @@ export function VideoPlayer({
         case 'ArrowRight':
           e.preventDefault()
           if (cur === 'seek') {
-            seekBy(SEEK_STEP)
+            accelSeek(1)
           } else {
             const n = findInRow('right')
             if (n) setFocused(n)
@@ -325,14 +363,34 @@ export function VideoPlayer({
         case 'Escape':
         case 'Backspace':
           e.preventDefault()
-          onClose()
+          // If the controls were visible, Back just hides them. Only Back with
+          // controls already hidden closes the player.
+          if (wasVisible) {
+            if (hideTimer.current) window.clearTimeout(hideTimer.current)
+            setControlsVisible(false)
+          } else {
+            onClose()
+          }
           return
       }
     }
 
+    // Releasing the arrow key ends the hold, so the next press starts fresh
+    // at the base step.
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        accelCountRef.current = 0
+        accelDirRef.current = 0
+      }
+    }
+
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [bumpActivity, seekBy, onClose])
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [bumpActivity, seekBy, accelSeek, onClose])
 
   const progress = duration > 0 ? position / duration : 0
   const pct = `${(progress * 100).toFixed(1)}%`
@@ -371,7 +429,6 @@ export function VideoPlayer({
             className={`player-seek__bar${focused === 'seek' ? ' player-seek__bar--focused' : ''}`}
           >
             <div className="player-seek__fill" style={{ width: pct }} />
-            <div className="player-seek__playhead" style={{ left: pct }} />
           </div>
           <div className="player-seek__times">
             <span className="player-seek__time">{fmtTime(position)}</span>

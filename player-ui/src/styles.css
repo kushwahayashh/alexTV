@@ -136,24 +136,12 @@ body {
   left: 0;
   height: 100%;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.45);
+  transition: background 0.16s ease;
 }
-/* Vertical playhead line — visible only when the seekbar is focused */
-.player-seek__playhead {
-  position: absolute;
-  top: 50%;
-  width: 6px;
-  height: 16px;
-  border-radius: 2px;
+.player-seek__bar--focused .player-seek__fill {
   background: var(--focus);
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  transition: opacity 0.16s ease;
 }
-.player-seek__bar--focused .player-seek__playhead {
-  opacity: 1;
-}
-
 /* ---------- Circular icon button (close, etc.) ---------- */
 .player-circle-btn {
   display: grid;

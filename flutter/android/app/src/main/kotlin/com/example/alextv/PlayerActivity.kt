@@ -130,8 +130,11 @@ private fun PlayerView.applyVarelaRoundSubtitleStyle() {
     }
 }
 
-private const val SEEK_STEP_MS = 10_000L
+private const val SEEK_STEP_MS = 10_000L // base seek step per Left/Right press
 private const val HIDE_DELAY_MS = 4_000L
+// Max gap between key-repeat events still counted as "holding". A slower gap
+// resets the accel ramp so a fresh tap always starts at the base step.
+private const val ACCEL_WINDOW_MS = 300L
 
 // Fixed design canvas width, mirroring Flutter's AppSizes.designWidth (1260) and
 // its _DesignScaler. TVs report a wide range of logical densities, so laying the
@@ -576,7 +579,15 @@ private fun PlayerScreen(
         menuKind = null
     }
 
-    BackHandler { if (menuKind != null) dismissMenu() else onClose() }
+    // Back: close an open menu first; else if controls are visible just hide
+    // them; only Back with controls already hidden closes the player.
+    BackHandler {
+        when {
+            menuKind != null -> dismissMenu()
+            controlsVisible -> controlsVisible = false
+            else -> onClose()
+        }
+    }
 
     fun togglePlay() {
         if (player.isPlaying) player.pause() else player.play()
@@ -594,9 +605,11 @@ private fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
             // Any key press re-shows the controls; the event still flows on to
-            // the focused child so navigation/seek keep working.
+            // the focused child so navigation/seek keep working. Back is
+            // excluded so BackHandler can tell whether the controls were
+            // already visible (Back hides them first, then closes).
             .onPreviewKeyEvent { e ->
-                if (e.type == KeyEventType.KeyDown) bump()
+                if (e.type == KeyEventType.KeyDown && e.key != Key.Back) bump()
                 false
             }
     ) {
@@ -882,19 +895,53 @@ private fun SeekBar(
         label = "seekHeight",
     )
 
-    // Outer row keeps the bar full-width; the playhead can overflow vertically.
+    // Accelerated seeking: while Left/Right is held, each key repeat grows the
+    // step so a long hold covers ground fast. accelCount is the run of
+    // consecutive presses in one direction; accelDir is that direction (-1/+1);
+    // accelLast is the timestamp of the last press (to detect release/pause).
+    val accelCount = remember { mutableIntStateOf(0) }
+    val accelDir = remember { mutableIntStateOf(0) }
+    val accelLast = remember { mutableLongStateOf(0L) }
+
+    fun accelSeek(dir: Int) {
+        val now = System.currentTimeMillis()
+        val held = accelDir.intValue == dir && now - accelLast.longValue <= ACCEL_WINDOW_MS
+        accelCount.intValue = if (held) accelCount.intValue + 1 else 0
+        accelDir.intValue = dir
+        accelLast.longValue = now
+
+        // Gentle tiered multiplier by how long the key has been held: holds at
+        // the base step for a while, then eases up.
+        val c = accelCount.intValue
+        val mult = if (c < 8) 1 else if (c < 18) 2 else if (c < 30) 3 else 4
+        onSeek(dir * SEEK_STEP_MS * mult)
+    }
+
+    fun resetAccel() {
+        accelCount.intValue = 0
+        accelDir.intValue = 0
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(16.dp)
             .focusRequester(focusRequester)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { if (!it.isFocused) resetAccel(); focused = it.isFocused }
             .focusable()
             .onKeyEvent { e ->
+                // Releasing Left/Right ends the hold so the next press starts
+                // fresh at the base step.
+                if (e.type == KeyEventType.KeyUp) {
+                    if (e.key == Key.DirectionLeft || e.key == Key.DirectionRight) {
+                        resetAccel()
+                    }
+                    return@onKeyEvent false
+                }
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
-                    Key.DirectionLeft -> { onSeek(-SEEK_STEP_MS); true }
-                    Key.DirectionRight -> { onSeek(SEEK_STEP_MS); true }
+                    Key.DirectionLeft -> { accelSeek(-1); true }
+                    Key.DirectionRight -> { accelSeek(1); true }
                     Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> { onTogglePlay(); true }
                     else -> false
                 }
@@ -912,7 +959,8 @@ private fun SeekBar(
                     else Color.White.copy(alpha = 0.22f)
                 ),
         ) {
-            // Fill wrapper spans `progress` fraction of the track.
+            // Fill wrapper spans `progress` fraction of the track. Dull by
+            // default, solid white when the bar is focused.
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -922,29 +970,11 @@ private fun SeekBar(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.6f))
+                        .background(
+                            if (focused) FocusColor
+                            else Color.White.copy(alpha = 0.45f)
+                        )
                 )
-            }
-        }
-
-        // Vertical playhead line at the right edge of the fill (focused only).
-        if (focused) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(progress),
-                    contentAlignment = Alignment.CenterEnd,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(6.dp)
-                            .height(16.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(FocusColor)
-                    )
-                }
             }
         }
     }
