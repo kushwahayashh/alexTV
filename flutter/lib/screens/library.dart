@@ -1,12 +1,18 @@
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import '../api/library.dart';
 import '../components/header_button.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
 
 enum _Status { loading, ready, error }
+
+/// Method channel to the native full-screen ExoPlayer (see MainActivity /
+/// PlayerActivity). Same channel the Details Player uses; the Library resolves
+/// a direct stream URL and launches playback with no quality/file picker.
+const _playerChannel = MethodChannel('com.example.alextv/player');
 
 /// File-manager style library, backed by the AlexTV Library backend. The
 /// current path is held in state; the global Back button climbs into the
@@ -65,9 +71,28 @@ class _LibraryState extends State<Library> {
     _load(folderPath);
   }
 
-  void _playFile(LibraryFile file) {
-    // Player wiring lands later; for now just surface the pick.
-    debugPrint('play library file ${file.name}');
+  Future<void> _playFile(LibraryFile file) async {
+    // Resolve the (fast-tunnel) stream URL, then hand it to the native
+    // ExoPlayer. The Library streams a single file directly, so there's no
+    // quality/file picker — launch straight into playback.
+    try {
+      final url = await fetchStreamUrl(file.path);
+      final dot = file.name.lastIndexOf('.');
+      final ext = dot >= 0 ? file.name.substring(dot + 1) : '';
+      await _playerChannel.invokeMethod('play', {
+        'url': url,
+        'ext': ext,
+        'title': file.name,
+        'subLabels': const <String>[],
+        'subUrls': const <String>[],
+      });
+    } catch (e) {
+      debugPrint('Could not start playback: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not start playback.')),
+      );
+    }
   }
 
   /// Back: climb into the parent folder if drilled in, otherwise pop the screen.
