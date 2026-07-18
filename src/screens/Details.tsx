@@ -13,7 +13,6 @@ import {
   type SeasonOption,
 } from '../api/series'
 import { FadeImage } from '../components/FadeImage'
-import { PawIcon } from '../components/PawIcon'
 import { Player } from '../components/Player'
 
 /**
@@ -153,7 +152,7 @@ export function Details({ media }: { media: Media }) {
           <div className="details__facts">
             <span>{isTv ? 'Series' : 'Movie'}</span>
             {media.year && <span>{media.year}</span>}
-            <span className="fact-rating"><PawIcon />{media.rating || '—'}</span>
+            <span>Rating {media.rating || '—'}</span>
             {isTv && seasons && !flatEpisodes && seasons.length > 0 && (
               <span>
                 {seasons.length} Season{seasons.length > 1 ? 's' : ''}

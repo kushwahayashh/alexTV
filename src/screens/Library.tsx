@@ -133,14 +133,9 @@ function Row({
         {isFolder ? <FolderIcon /> : <FileIcon />}
       </span>
       <span className="lib-row__name">{item.name}</span>
-      {!isFolder && (
+      {!isFolder && item.sizeFormatted && (
         <span className="lib-row__meta">
-          {item.resolution && (
-            <span className="lib-badge">{item.resolution}</span>
-          )}
-          {item.sizeFormatted && (
-            <span className="lib-row__size">{item.sizeFormatted}</span>
-          )}
+          <span className="lib-row__size">{item.sizeFormatted}</span>
         </span>
       )}
     </div>

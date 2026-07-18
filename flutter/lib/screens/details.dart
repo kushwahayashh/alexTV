@@ -5,7 +5,6 @@ import '../api/stream.dart' as stream;
 import '../api/tmdb.dart';
 import '../components/hero.dart' show FadeIn;
 import '../components/fade_image.dart';
-import '../components/paw_icon.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
 import '../routes.dart';
@@ -399,22 +398,7 @@ class _DetailsContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              // Paw glyph inlined before the rating, vertically centered on the
-              // text line like React's .fact-rating (align-items:center, gap
-              // 0.35em ≈ 5.6px). WidgetSpan keeps the whole fact on the row's
-              // shared text baseline.
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: PawIcon(color: AppColors.muted),
-                    ),
-                    const WidgetSpan(child: SizedBox(width: 5.6)),
-                    TextSpan(text: '${media.rating == 0 ? '—' : media.rating}'),
-                  ],
-                ),
-              ),
+              Text('Rating ${media.rating == 0 ? '—' : media.rating}'),
               if (isTv &&
                   seasons != null &&
                   flatEpisodes == null &&

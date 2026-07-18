@@ -190,16 +190,6 @@ body {
 }
 /* Rating fact: center the paw glyph against the number instead of letting the
    SVG sit on the text baseline (which drops it low). */
-.fact-rating {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-}
-.paw-icon {
-  display: block;
-  width: 1.05em;
-  height: 1.05em;
-}
 .hero__overview {
   color: #d7dee5;
   font-size: 1.02rem;
@@ -982,19 +972,6 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.lib-badge {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.lib-row--focused .lib-badge {
-  background: rgba(0, 0, 0, 0.12);
-  color: rgba(0, 0, 0, 0.62);
 }
 .lib-row__size {
   font-size: 0.9rem;

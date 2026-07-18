@@ -415,35 +415,12 @@ class _LibraryRowState extends State<_LibraryRow> {
   }
 
   List<Widget> _badges(bool focused, Color textColor) {
-    // Folders carry no meta; files show a resolution pill + plain-text size.
+    // Folders carry no meta; files show plain-text size only.
     if (widget.item is! FileItem) return const [];
     final file = (widget.item as FileItem).file;
 
     final out = <Widget>[];
-    if (file.resolution != null) {
-      final bg = focused
-          ? const Color(0x1F000000)
-          : Colors.white.withValues(alpha: 0.08);
-      out.add(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            file.resolution!,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 13.1,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      );
-    }
     if (file.sizeFormatted != null) {
-      if (out.isNotEmpty) out.add(const SizedBox(width: 8));
       out.add(
         Text(
           file.sizeFormatted!,
