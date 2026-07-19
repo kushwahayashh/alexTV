@@ -533,6 +533,15 @@ class PlayerActivity : ComponentActivity() {
         )
     }
 
+    // Persist on pause — this runs BEFORE the returning Library activity's
+    // onResume, so its progress refresh reads the position we just wrote.
+    // (onStop lands too late: MainActivity resumes and re-reads the store
+    // before onStop fires, so the bar would show the stale position.)
+    override fun onPause() {
+        super.onPause()
+        persistProgress()
+    }
+
     override fun onStop() {
         super.onStop()
         persistProgress()
