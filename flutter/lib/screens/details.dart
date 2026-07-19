@@ -386,13 +386,14 @@ class _DetailsContent extends StatelessWidget {
             color: AppColors.muted,
             fontWeight: FontWeight.w600,
             fontSize: 16,
+            letterSpacing: 0.64,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(isTv ? 'Series' : 'Movie'),
+              Text(isTv ? 'SERIES' : 'MOVIE'),
               if (media.year.isNotEmpty) ...[
                 const SizedBox(width: 16),
                 Text(media.year),
@@ -407,7 +408,7 @@ class _DetailsContent extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('Rating'),
+                  const Text('RATING'),
                   const SizedBox(width: 6),
                   Text(media.rating == 0 ? 'N/A' : '${media.rating}'),
                 ],
@@ -418,7 +419,7 @@ class _DetailsContent extends StatelessWidget {
                   seasons!.isNotEmpty) ...[
                 const SizedBox(width: 16),
                 Text(
-                  '${seasons!.length} Season${seasons!.length > 1 ? 's' : ''}',
+                  '${seasons!.length} SEASON${seasons!.length > 1 ? 'S' : ''}',
                 ),
               ],
             ],

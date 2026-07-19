@@ -121,6 +121,49 @@ body {
   color: var(--bg);
 }
 
+/* Navbar buttons: no pill container, just an animated underline. Scoped to the
+   nav rows so Details/Player pills keep their filled style. */
+.home__header .header-btn,
+.library__nav .header-btn,
+.search__nav .header-btn {
+  padding: 10px 4px;
+  border-radius: 0;
+  background: none;
+  position: relative;
+  transition: color 0.16s ease;
+}
+.home__header .header-btn::after,
+.library__nav .header-btn::after,
+.search__nav .header-btn::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 2px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.16s ease;
+}
+.home__header .header-btn:hover,
+.home__header .header-btn--focused,
+.library__nav .header-btn:hover,
+.library__nav .header-btn--focused,
+.search__nav .header-btn:hover,
+.search__nav .header-btn--focused {
+  background: none;
+  color: var(--text);
+}
+.home__header .header-btn:hover::after,
+.home__header .header-btn--focused::after,
+.library__nav .header-btn:hover::after,
+.library__nav .header-btn--focused::after,
+.search__nav .header-btn:hover::after,
+.search__nav .header-btn--focused::after {
+  transform: scaleX(1);
+}
+
 .fade-img--loaded {
   animation: fadeImgIn 0.4s ease-out both;
 }
@@ -187,6 +230,8 @@ body {
   color: var(--muted);
   font-weight: 600;
   margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 /* Rating fact: center the paw glyph against the number instead of letting the
    SVG sit on the text baseline (which drops it low). */
@@ -316,6 +361,8 @@ body {
   color: var(--muted);
   font-weight: 600;
   margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .details__overview {
   color: #d7dee5;

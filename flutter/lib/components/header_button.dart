@@ -55,23 +55,30 @@ class _HeaderButtonState extends State<HeaderButton> {
       key: _controller.keyOf(_id),
       child: GestureDetector(
         onTap: widget.onSelect,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: focused
-                ? AppColors.focus
-                : Colors.white.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: focused ? AppColors.bg : AppColors.text,
-            ),
+        // No pill container — just an animated underline that scales in on
+        // focus. Mirrors the React navbar style.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
+                ),
+              ),
+              const SizedBox(height: 4),
+              AnimatedScale(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOut,
+                scale: focused ? 1 : 0,
+                child: Container(height: 2, color: AppColors.text),
+              ),
+            ],
           ),
         ),
       ),

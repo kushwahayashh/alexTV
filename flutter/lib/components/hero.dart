@@ -151,13 +151,14 @@ class _HeroContent extends StatelessWidget {
             color: AppColors.muted,
             fontWeight: FontWeight.w600,
             fontSize: 16,
+            letterSpacing: 0.64,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(media.mediaType == 'tv' ? 'Series' : 'Movie'),
+              Text(media.mediaType == 'tv' ? 'SERIES' : 'MOVIE'),
               if (media.year.isNotEmpty) ...[
                 const SizedBox(width: 16),
                 Text(media.year),
@@ -172,7 +173,7 @@ class _HeroContent extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('Rating'),
+                  const Text('RATING'),
                   const SizedBox(width: 6),
                   Text(media.rating == 0 ? 'N/A' : '${media.rating}'),
                 ],
