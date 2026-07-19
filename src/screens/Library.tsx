@@ -59,7 +59,8 @@ export function Library({
         </div>
       </div>
 
-      <Breadcrumb path={path} />
+      <Breadcrumb path={path} onNavigate={onOpenFolder} />
+
 
       {status === 'loading' && (
         <div className="library__msg library__msg--loader">
@@ -88,20 +89,64 @@ export function Library({
   )
 }
 
-/** Current location as the folder path below the root ("Breaking Bad / S01"). */
-function Breadcrumb({ path }: { path: string }) {
+/**
+ * Location trail, always rooted at "Home" ("Home › Breaking Bad › S01").
+ * Each crumb is focusable and navigates to that folder level when selected, so
+ * clicking a crumb climbs back up the tree.
+ */
+function Breadcrumb({
+  path,
+  onNavigate,
+}: {
+  path: string
+  onNavigate: (folderPath: string) => void
+}) {
   const names = path.split('/').filter(Boolean)
-  // At the root there's nothing to show — we already know we're in the Library.
-  if (names.length === 0) return null
+  // Build the (label, target-path) pairs: Home at root, then each folder level.
+  const crumbs = [
+    { label: 'Home', target: '/' },
+    ...names.map((name, i) => ({
+      label: name,
+      target: '/' + names.slice(0, i + 1).join('/'),
+    })),
+  ]
+
+  // The whole bar is one focusable item, like a list row. Selecting it climbs
+  // one folder up (to the parent of the current level).
+  const parentTarget = crumbs.length > 1 ? crumbs[crumbs.length - 2].target : '/'
+  const { ref, focused } = useFocusable({
+    scrollMode: 'nearest',
+    onSelect: () => onNavigate(parentTarget),
+  })
 
   return (
-    <div className="library__crumbs">
-      {names.map((name, i) => (
-        <span key={i} className="library__crumb-part">
-          {i > 0 && <span className="library__crumb-sep">›</span>}
-          <span className="library__crumb">{name}</span>
-        </span>
-      ))}
+    <div
+      ref={ref as React.RefObject<HTMLDivElement>}
+      className={`library__crumbbar${
+        focused ? ' library__crumbbar--focused' : ''
+      }`}
+      onClick={() => onNavigate(parentTarget)}
+    >
+      <span className="library__crumb-icon" aria-hidden>
+        <FolderUpIcon />
+      </span>
+      <div className="library__crumbs">
+        {crumbs.map((crumb, i) => {
+          const isLast = i === crumbs.length - 1
+          return (
+            <span key={crumb.target} className="library__crumb-part">
+              {i > 0 && <span className="library__crumb-sep">/</span>}
+              <span
+                className={`library__crumb${
+                  isLast ? ' library__crumb--current' : ''
+                }`}
+              >
+                {crumb.label}
+              </span>
+            </span>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -165,6 +210,24 @@ function Row({
         </div>
       )}
     </div>
+  )
+}
+
+function FolderUpIcon() {
+  // "Level up" arrow — bends up and to the left, meaning go up one folder.
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h11a5 5 0 0 1 5 5v6" />
+    </svg>
   )
 }
 

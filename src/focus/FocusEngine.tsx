@@ -241,6 +241,19 @@ export function FocusProvider({
     if (entry) entry.active = active
   }, [])
 
+  // Whether the active screen has a visible hero to release focus into. Home
+  // (and Details) show one; Library/Search don't. When there's no hero, the
+  // "release to top" step is skipped so Up/Down hop straight between the header
+  // and the content instead of wasting a press on an empty release.
+  const heroVisible = useCallback((): boolean => {
+    const heroes = document.querySelectorAll('.hero, .details__hero')
+    for (const el of heroes) {
+      const r = (el as HTMLElement).getBoundingClientRect()
+      if (r.width > 0 || r.height > 0) return true
+    }
+    return false
+  }, [])
+
   // Leftmost header in document order — where focus enters when pressing Up
   // from the hero.
   const firstHeader = useCallback((): FocusableEntry | null => {
@@ -321,10 +334,16 @@ export function FocusProvider({
 
         e.preventDefault()
 
-        // Header focused: left/right moves between headers, down drops to hero.
+        // Header focused: left/right moves between headers. Down drops into the
+        // hero when there is one; otherwise straight into the content grid.
         if (curAlive && headerIdsRef.current.has(cur!)) {
           if (dir === 'down') {
-            releaseToTop()
+            if (heroVisible()) {
+              releaseToTop()
+            } else {
+              const first = firstInDomOrder()
+              if (first) setFocus(first.id)
+            }
           } else if (dir === 'left' || dir === 'right') {
             const next = nextHeader(cur!, dir)
             if (next) setFocus(next)
@@ -347,8 +366,15 @@ export function FocusProvider({
         if (next) {
           setFocus(next)
         } else if (dir === 'up') {
-          // Nothing above the top row — release focus back up to the hero.
-          releaseToTop()
+          // Nothing above the top row. With a hero, release focus up to reveal
+          // it (a second Up then reaches the header). Without one, jump straight
+          // to the header so it's a single press.
+          if (heroVisible()) {
+            releaseToTop()
+          } else {
+            const first = firstHeader()
+            if (first) setFocus(first.id)
+          }
         }
         return
       }
@@ -378,7 +404,15 @@ export function FocusProvider({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [setFocus, onBack, firstInDomOrder, releaseToTop, firstHeader, nextHeader])
+  }, [
+    setFocus,
+    onBack,
+    firstInDomOrder,
+    releaseToTop,
+    firstHeader,
+    nextHeader,
+    heroVisible,
+  ])
 
   return (
     <FocusContext.Provider value={{ register, unregister, focusId, setFocus, setActive }}>

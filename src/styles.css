@@ -940,11 +940,47 @@ body {
   gap: 12px;
   flex: 0 0 auto;
 }
+/* Crumb bar: a surface container like the topbar, holding the location trail. */
+.library__crumbbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+/* Focused like a focused list row — whole bar highlights. */
+.library__crumbbar--focused {
+  background: var(--focus);
+  color: var(--bg);
+  transform: scale(1.015);
+}
+.library__crumbbar--focused .library__crumb,
+.library__crumbbar--focused .library__crumb--current,
+.library__crumbbar--focused .library__crumb-sep,
+.library__crumbbar--focused .library__crumb-icon {
+  color: var(--bg);
+}
+.library__crumb-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-right: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.library__crumb-icon svg {
+  width: 22px;
+  height: 22px;
+}
 .library__crumbs {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
   font-size: 1.1rem;
   color: var(--muted);
 }
@@ -956,8 +992,11 @@ body {
 .library__crumb-sep {
   color: rgba(255, 255, 255, 0.28);
 }
-/* The deepest crumb (last one rendered) is the current location. */
-.library__crumb-part:last-child .library__crumb {
+.library__crumb {
+  color: var(--muted);
+}
+/* The deepest crumb is the current location — emphasised. */
+.library__crumb--current {
   color: var(--text);
   font-weight: 700;
 }
@@ -970,6 +1009,11 @@ body {
 }
 .library__msg--loader {
   color: inherit;
+  /* Center in the viewport, not just the leftover flow space. The topbar +
+     breadcrumb occupy ~84px above; subtract twice so the box center lands at
+     true screen center (matches the Flutter Library loader). */
+  padding: 0;
+  min-height: calc(100vh - 168px);
 }
 .library__list {
   display: flex;

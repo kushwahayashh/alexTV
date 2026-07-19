@@ -167,51 +167,61 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: FocusScopeProvider(
-        controller: _focus,
-        child: Focus(
-          focusNode: _keyboardNode,
-          autofocus: true,
-          onKeyEvent: _handleKey,
-          child: SingleChildScrollView(
-            controller: _pageController,
-            physics: const ClampingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSizes.pagePadding,
-                24,
-                AppSizes.pagePadding,
-                64,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      HeaderButton(
-                        label: 'Home',
-                        onSelect: () => Navigator.of(context).maybePop(),
-                      ),
-                      const SizedBox(width: 12),
-                      const HeaderButton(label: 'Search'),
-                      const SizedBox(width: 12),
-                      const HeaderButton(label: 'Library'),
-                    ],
-                  ),
-                  _Breadcrumb(path: _path),
-                  const SizedBox(height: 20),
-                  _LibraryBody(
-                    status: _status,
-                    listing: _listing,
-                    progress: _progress,
-                    pageController: _pageController,
-                    onOpenFolder: _openFolder,
-                    onPlayFile: _playFile,
-                  ),
-                ],
+    return PopScope(
+      // At root, let Back pop the whole Library route. Drilled into a folder,
+      // block the pop and climb to the parent instead — otherwise hardware Back
+      // (dispatched by the Navigator, not our focus engine) would tear down the
+      // whole screen instead of stepping out one level.
+      canPop: _path == '/',
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _openFolder(parentOf(_path));
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: FocusScopeProvider(
+          controller: _focus,
+          child: Focus(
+            focusNode: _keyboardNode,
+            autofocus: true,
+            onKeyEvent: _handleKey,
+            child: SingleChildScrollView(
+              controller: _pageController,
+              physics: const ClampingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSizes.pagePadding,
+                  24,
+                  AppSizes.pagePadding,
+                  64,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        HeaderButton(
+                          label: 'Home',
+                          onSelect: () => Navigator.of(context).maybePop(),
+                        ),
+                        const SizedBox(width: 12),
+                        const HeaderButton(label: 'Search'),
+                        const SizedBox(width: 12),
+                        const HeaderButton(label: 'Library'),
+                      ],
+                    ),
+                    _Breadcrumb(path: _path, onNavigate: _openFolder),
+                    const SizedBox(height: 20),
+                    _LibraryBody(
+                      status: _status,
+                      listing: _listing,
+                      progress: _progress,
+                      pageController: _pageController,
+                      onOpenFolder: _openFolder,
+                      onPlayFile: _playFile,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -221,36 +231,74 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
   }
 }
 
-/// Current location as the folder path below the root ("Breaking Bad / S01").
-/// Empty at the root — we already know we're in the Library.
-class _Breadcrumb extends StatelessWidget {
+/// Current location trail, always rooted at "Home" then each folder level
+/// ("Home / Breaking Bad / S01"). The whole bar is one focusable item — like a
+/// list row — and selecting it climbs one folder up.
+class _Breadcrumb extends StatefulWidget {
   final String path;
-  const _Breadcrumb({required this.path});
+  final void Function(String) onNavigate;
+  const _Breadcrumb({required this.path, required this.onNavigate});
+
+  @override
+  State<_Breadcrumb> createState() => _BreadcrumbState();
+}
+
+class _BreadcrumbState extends State<_Breadcrumb> {
+  late FocusController _controller;
+  late int _id;
+  bool _registered = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_registered) {
+      _controller = FocusScopeProvider.read(context);
+      _id = _controller.register(onSelect: _select);
+      _registered = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.unregister(_id);
+    super.dispose();
+  }
+
+  void _select() => widget.onNavigate(parentOf(widget.path));
 
   @override
   Widget build(BuildContext context) {
-    final names = path.split('/').where((s) => s.isNotEmpty).toList();
-    if (names.isEmpty) return const SizedBox.shrink();
+    final controller = FocusScopeProvider.of(context);
+    final focused = controller.isFocused(_id);
+
+    final names = widget.path.split('/').where((s) => s.isNotEmpty).toList();
+    // Home at the root, then one crumb per folder level.
+    final labels = ['Home', ...names];
 
     final parts = <Widget>[];
-    for (var i = 0; i < names.length; i++) {
+    for (var i = 0; i < labels.length; i++) {
       if (i > 0) {
         parts.add(
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              '›',
-              style: TextStyle(color: Color(0x47FFFFFF), fontSize: 17.6),
+              '/',
+              style: TextStyle(
+                color: focused ? AppColors.bg : const Color(0x47FFFFFF),
+                fontSize: 17.6,
+              ),
             ),
           ),
         );
       }
-      final isLast = i == names.length - 1;
+      final isLast = i == labels.length - 1;
       parts.add(
         Text(
-          names[i],
+          labels[i],
           style: TextStyle(
-            color: isLast ? AppColors.text : AppColors.muted,
+            color: focused
+                ? AppColors.bg
+                : (isLast ? AppColors.text : AppColors.muted),
             fontSize: 17.6,
             fontWeight: isLast ? FontWeight.w700 : FontWeight.w400,
           ),
@@ -260,7 +308,37 @@ class _Breadcrumb extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: 20),
-      child: Row(children: parts),
+      child: KeyedSubtree(
+        key: _controller.keyOf(_id),
+        child: GestureDetector(
+          onTap: _select,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            transformAlignment: Alignment.center,
+            transform: focused
+                ? (Matrix4.identity()..scaleByDouble(1.015, 1.015, 1.015, 1.0))
+                : Matrix4.identity(),
+            decoration: BoxDecoration(
+              color: focused ? AppColors.focus : AppColors.surface,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  // "Level up" arrow — go up one folder.
+                  Icons.subdirectory_arrow_left_rounded,
+                  size: 22,
+                  color: focused ? AppColors.bg : AppColors.muted,
+                ),
+                const SizedBox(width: 18),
+                ...parts,
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

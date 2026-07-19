@@ -251,11 +251,19 @@ class FocusController extends ChangeNotifier {
         return KeyEventResult.handled;
       }
 
-      // Header focused: left/right moves between headers, down drops to hero.
+      // Header focused: left/right moves between headers. Down drops into the
+      // hero when there is one (onReleaseTop set); otherwise — on hero-less
+      // screens like Library/Search — straight into the content grid, so it's
+      // a single press instead of wasting one on an empty release.
       if (curAlive && cur != null && _headerIds.contains(cur)) {
         if (dir == Direction.down) {
-          clearFocus();
-          onReleaseTop?.call();
+          if (onReleaseTop != null) {
+            clearFocus();
+            onReleaseTop.call();
+          } else {
+            final first = _firstInOrder();
+            if (first != null) _setFocus(first);
+          }
         } else if (dir == Direction.left || dir == Direction.right) {
           final next = _nextHeader(cur, dir);
           if (next != null) _setFocus(next);
@@ -278,9 +286,16 @@ class FocusController extends ChangeNotifier {
       if (next != null) {
         _setFocus(next);
       } else if (dir == Direction.up) {
-        // Nothing above the top row — release focus back up to the hero.
-        clearFocus();
-        onReleaseTop?.call();
+        // Nothing above the top row. With a hero (onReleaseTop set), release
+        // focus up to reveal it — a second Up then reaches the header. Without
+        // one, jump straight to the header so it's a single press.
+        if (onReleaseTop != null) {
+          clearFocus();
+          onReleaseTop.call();
+        } else {
+          final first = _firstHeader();
+          if (first != null) _setFocus(first);
+        }
       }
       return KeyEventResult.handled;
     }
