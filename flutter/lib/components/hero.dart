@@ -163,7 +163,20 @@ class _HeroContent extends StatelessWidget {
                 Text(media.year),
               ],
               const SizedBox(width: 16),
-              Text('Rating ${media.rating == 0 ? '—' : media.rating}'),
+              // Split label and value into two Texts in a center-aligned row so
+              // Varela Round's lining figures (cap-height) and the mixed-case
+              // "Rating" optically align instead of sharing one baseline where
+              // the number rides above the lowercase. Em dash dropped — it
+              // floats at the em-box center in this font, not the baseline.
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text('Rating'),
+                  const SizedBox(width: 6),
+                  Text(media.rating == 0 ? 'N/A' : '${media.rating}'),
+                ],
+              ),
             ],
           ),
         ),
