@@ -931,18 +931,41 @@ body {
 }
 .lib-row {
   display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 14px 20px;
+  flex-direction: column;
   border-radius: 0;
+  overflow: hidden;
   background: var(--surface);
   color: var(--text);
   transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.lib-row__content {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
 }
 .lib-row--focused {
   background: var(--focus);
   color: var(--bg);
   transform: scale(1.015);
+}
+/* Watch-progress bar, pinned flush at the row bottom (see Flutter _progressBar). */
+.lib-row__progress {
+  height: 3px;
+  margin: 0 20px 6px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.lib-row--focused .lib-row__progress {
+  background: rgba(0, 0, 0, 0.12);
+}
+.lib-row__progress-fill {
+  height: 100%;
+  background: var(--text, #f4f4f5);
+}
+.lib-row--focused .lib-row__progress-fill {
+  background: var(--bg, #090909);
 }
 .lib-row__icon {
   flex: 0 0 auto;

@@ -4,6 +4,7 @@ import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
 
 class MainActivity : FlutterActivity() {
 
@@ -30,6 +31,9 @@ class MainActivity : FlutterActivity() {
                             putExtra("url", url)
                             putExtra("ext", call.argument<String>("ext") ?: "")
                             putExtra("title", call.argument<String>("title") ?: "")
+                            // Stable backend path the Library keys watch-progress
+                            // on. Blank/absent for TMDB playback (untracked).
+                            putExtra("mediaPath", call.argument<String>("mediaPath") ?: "")
                             // Web (FebBox) subtitles resolved by Dart: parallel
                             // label/URL lists, attached to the media item natively.
                             putStringArrayListExtra(
@@ -43,6 +47,16 @@ class MainActivity : FlutterActivity() {
                         }
                         startActivity(intent)
                         result.success(true)
+                    }
+                    "getProgress" -> {
+                        // Return saved watch-progress for the given backend paths
+                        // as a JSON string: { path: {progress, positionMs, ...} }.
+                        val paths = call.argument<List<String>>("paths") ?: emptyList()
+                        val payload = PlaybackProgressStore.getProgressPayload(
+                            this,
+                            JSONArray(paths).toString(),
+                        )
+                        result.success(payload)
                     }
                     else -> result.notImplemented()
                 }

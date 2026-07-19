@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Density
@@ -401,11 +402,17 @@ class PlayerActivity : ComponentActivity() {
         const val EXTRA_URL = "url"
         const val EXTRA_EXT = "ext"
         const val EXTRA_TITLE = "title"
+        const val EXTRA_MEDIA_PATH = "mediaPath"
         const val EXTRA_SUB_LABELS = "subLabels"
         const val EXTRA_SUB_URLS = "subUrls"
     }
 
     private var player: ExoPlayer? = null
+
+    // Stable backend path for the file being played; the key watch-progress is
+    // stored under. Blank for TMDB/Details playback (no stable path), which
+    // disables tracking (see PlaybackProgressStore).
+    private var mediaPath: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -414,11 +421,16 @@ class PlayerActivity : ComponentActivity() {
         val url = intent.getStringExtra(EXTRA_URL)
         val ext = intent.getStringExtra(EXTRA_EXT)?.lowercase() ?: ""
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
+        mediaPath = intent.getStringExtra(EXTRA_MEDIA_PATH) ?: ""
 
         if (url.isNullOrEmpty()) {
             finish()
             return
         }
+
+        // Resume from the last saved position if this file was partly watched
+        // (0L when untracked, too early, or effectively finished).
+        val resumePositionMs = PlaybackProgressStore.getResumePositionMs(this, mediaPath)
 
         // Web (FebBox) subtitles resolved by Dart: parallel label/URL lists. We
         // attach each as an external VTT text track and remember the labels so
@@ -428,13 +440,14 @@ class PlayerActivity : ComponentActivity() {
         val webSubs = subLabels.zip(subUrls)
         val webSubLabels = subLabels.toSet()
 
-        val exo = createPlayer(url, ext, title, webSubs)
+        val exo = createPlayer(url, ext, title, webSubs, resumePositionMs)
         player = exo
 
         setContent {
             PlayerScreen(
                 player = exo,
                 title = title,
+                mediaPath = mediaPath,
                 webSubLabels = webSubLabels,
                 onClose = { finish() },
             )
@@ -446,6 +459,7 @@ class PlayerActivity : ComponentActivity() {
         ext: String,
         title: String,
         webSubs: List<Pair<String, String>>,
+        resumePositionMs: Long,
     ): ExoPlayer {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(BROWSER_UA)
@@ -494,18 +508,40 @@ class PlayerActivity : ComponentActivity() {
 
         exo.setMediaItem(mediaItem)
         exo.prepare()
+        // Resume where we left off before starting playback (0L = start fresh).
+        if (resumePositionMs > 0L) exo.seekTo(resumePositionMs)
         exo.playWhenReady = true
 
         return exo
     }
 
+    /**
+     * Persist the current position under [mediaPath] so the Library can resume
+     * and draw a progress bar. No-op for untracked playback (blank path). The
+     * store itself drops entries that are too early or effectively finished.
+     */
+    private fun persistProgress() {
+        val p = player ?: return
+        if (mediaPath.isBlank()) return
+        val dur = p.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
+        PlaybackProgressStore.saveProgress(
+            context = this,
+            mediaPath = mediaPath,
+            title = intent.getStringExtra(EXTRA_TITLE) ?: "",
+            positionMs = p.currentPosition,
+            durationMs = dur,
+        )
+    }
+
     override fun onStop() {
         super.onStop()
+        persistProgress()
         player?.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        persistProgress()
         player?.release()
         player = null
     }
@@ -541,9 +577,11 @@ private fun DesignScaler(content: @Composable () -> Unit) {
 private fun PlayerScreen(
     player: ExoPlayer,
     title: String,
+    mediaPath: String,
     webSubLabels: Set<String>,
     onClose: () -> Unit,
 ) {
+    val context = LocalContext.current
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var initialized by remember { mutableStateOf(false) }
@@ -585,6 +623,11 @@ private fun PlayerScreen(
                 // Re-buffering mid-playback (once past the initial load) shows
                 // the same spinner over the controls.
                 buffering = state == Player.STATE_BUFFERING
+                // Finished playback: drop any saved progress so the Library
+                // stops showing a resume bar for this file.
+                if (state == Player.STATE_ENDED) {
+                    PlaybackProgressStore.clearProgress(context, mediaPath)
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) {

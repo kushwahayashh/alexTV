@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -14,6 +16,28 @@ enum _Status { loading, ready, error }
 /// a direct stream URL and launches playback with no quality/file picker.
 const _playerChannel = MethodChannel('com.example.alextv/player');
 
+/// Fetch saved watch-progress for [paths] from the native store. Returns a map
+/// of backend path -> progress fraction (0..1). Empty on any error or when
+/// nothing is tracked, so callers can treat "no bar" as the default.
+Future<Map<String, double>> fetchPlaybackProgress(List<String> paths) async {
+  if (paths.isEmpty) return const {};
+  try {
+    final raw = await _playerChannel.invokeMethod<String>('getProgress', {
+      'paths': paths,
+    });
+    if (raw == null || raw.isEmpty) return const {};
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    final out = <String, double>{};
+    decoded.forEach((path, value) {
+      final progress = (value is Map) ? value['progress'] : null;
+      if (progress is num) out[path] = progress.toDouble().clamp(0.0, 1.0);
+    });
+    return out;
+  } catch (_) {
+    return const {};
+  }
+}
+
 /// File-manager style library, backed by the AlexTV Library backend. The
 /// current path is held in state; the global Back button climbs into the
 /// parent folder if we're drilled in, otherwise it pops the screen. Selecting a
@@ -25,7 +49,7 @@ class Library extends StatefulWidget {
   State<Library> createState() => _LibraryState();
 }
 
-class _LibraryState extends State<Library> {
+class _LibraryState extends State<Library> with WidgetsBindingObserver {
   final _focus = FocusController();
   final _keyboardNode = FocusNode();
   final _pageController = ScrollController();
@@ -35,18 +59,31 @@ class _LibraryState extends State<Library> {
   LibraryListing? _listing;
   _Status _status = _Status.loading;
 
+  /// Watch-progress fraction (0..1) per file path, read back from the native
+  /// store. Only files with a saved position appear; missing = no bar.
+  Map<String, double> _progress = {};
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load(_path);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _keyboardNode.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The native player runs as a separate Activity; when it closes we resume.
+    // Re-read progress so a file's bar reflects the position just watched.
+    if (state == AppLifecycleState.resumed) _refreshProgress();
   }
 
   Future<void> _load(String path) async {
@@ -58,11 +95,28 @@ class _LibraryState extends State<Library> {
         _listing = data;
         _status = _Status.ready;
       });
+      _refreshProgress();
     } catch (e) {
       debugPrint('$e');
       if (!mounted || path != _path) return;
       setState(() => _status = _Status.error);
     }
+  }
+
+  /// Pull watch-progress for the currently-listed files from the native store
+  /// and update the fill bars. Called after a listing loads and after playback
+  /// returns (a file's position may have advanced or cleared on completion).
+  Future<void> _refreshProgress() async {
+    final listing = _listing;
+    if (listing == null) return;
+    final paths = [
+      for (final item in listing.items)
+        if (item is FileItem) item.file.path,
+    ];
+    if (paths.isEmpty) return;
+    final progress = await fetchPlaybackProgress(paths);
+    if (!mounted) return;
+    setState(() => _progress = progress);
   }
 
   void _openFolder(String folderPath) {
@@ -83,6 +137,9 @@ class _LibraryState extends State<Library> {
         'url': url,
         'ext': ext,
         'title': file.name,
+        // Stable backend path: the key the native player stores watch-progress
+        // under (so we can resume + draw the progress bar).
+        'mediaPath': file.path,
         'subLabels': const <String>[],
         'subUrls': const <String>[],
       });
@@ -149,6 +206,7 @@ class _LibraryState extends State<Library> {
                   _LibraryBody(
                     status: _status,
                     listing: _listing,
+                    progress: _progress,
                     pageController: _pageController,
                     onOpenFolder: _openFolder,
                     onPlayFile: _playFile,
@@ -210,6 +268,7 @@ class _Breadcrumb extends StatelessWidget {
 class _LibraryBody extends StatelessWidget {
   final _Status status;
   final LibraryListing? listing;
+  final Map<String, double> progress;
   final ScrollController pageController;
   final void Function(String) onOpenFolder;
   final void Function(LibraryFile) onPlayFile;
@@ -217,6 +276,7 @@ class _LibraryBody extends StatelessWidget {
   const _LibraryBody({
     required this.status,
     required this.listing,
+    required this.progress,
     required this.pageController,
     required this.onOpenFolder,
     required this.onPlayFile,
@@ -271,6 +331,10 @@ class _LibraryBody extends StatelessWidget {
                 FileItem(:final file) => file.path,
               }),
               item: item,
+              progress: switch (item) {
+                FileItem(:final file) => progress[file.path] ?? 0.0,
+                _ => 0.0,
+              },
               pageController: pageController,
               onOpenFolder: onOpenFolder,
               onPlayFile: onPlayFile,
@@ -283,6 +347,8 @@ class _LibraryBody extends StatelessWidget {
 
 class _LibraryRow extends StatefulWidget {
   final LibraryItem item;
+  /// Watch-progress fraction (0..1); 0 hides the bar.
+  final double progress;
   final ScrollController pageController;
   final void Function(String) onOpenFolder;
   final void Function(LibraryFile) onPlayFile;
@@ -290,6 +356,7 @@ class _LibraryRow extends StatefulWidget {
   const _LibraryRow({
     super.key,
     required this.item,
+    required this.progress,
     required this.pageController,
     required this.onOpenFolder,
     required this.onPlayFile,
@@ -381,33 +448,74 @@ class _LibraryRowState extends State<_LibraryRow> {
           transform: focused
               ? (Matrix4.identity()..scaleByDouble(1.015, 1.015, 1.015, 1.0))
               : Matrix4.identity(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: focused ? AppColors.focus : AppColors.surface,
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                _isFolder ? Icons.folder_rounded : Icons.web_asset,
-                size: 24,
-                color: focused ? AppColors.bg : AppColors.muted,
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: onColor,
-                    fontSize: 16.8,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isFolder ? Icons.folder_rounded : Icons.web_asset,
+                      size: 24,
+                      color: focused ? AppColors.bg : AppColors.muted,
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: onColor,
+                          fontSize: 16.8,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ..._badges(focused, metaColor),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              ..._badges(focused, metaColor),
+              if (widget.progress > 0) _progressBar(focused),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Thin watch-progress bar floating just above the row bottom, inset from the
+  /// sides to line up under the content. A dull track with a white fill at the
+  /// watched fraction (min 2% so a sliver always shows); on a focused (white)
+  /// row the fill flips dark so it stays visible.
+  Widget _progressBar(bool focused) {
+    final track = focused ? const Color(0x1F000000) : const Color(0x14FFFFFF);
+    final fill = focused ? AppColors.bg : AppColors.text;
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: SizedBox(
+          height: 3,
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: track),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: widget.progress.clamp(0.02, 1.0),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(color: fill),
+                ),
+              ),
+            ),
           ),
         ),
       ),

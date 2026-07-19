@@ -106,6 +106,21 @@ function Breadcrumb({ path }: { path: string }) {
   )
 }
 
+/**
+ * MOCK: fake watch-progress so we can preview the resume bar styling. Hashes the
+ * file path to a stable fraction; ~40% of files get a bar, the rest none. This
+ * stands in for the native PlaybackProgressStore the Android build reads back.
+ */
+function mockProgress(item: LibraryItem): number {
+  if (item.type === 'folder') return 0
+  let h = 0
+  for (let i = 0; i < item.path.length; i++) {
+    h = (h * 31 + item.path.charCodeAt(i)) >>> 0
+  }
+  if (h % 5 >= 2) return 0 // ~60% have no progress
+  return 0.08 + ((h >>> 3) % 85) / 100 // 0.08 .. 0.93
+}
+
 function Row({
   item,
   onOpenFolder,
@@ -116,6 +131,7 @@ function Row({
   onPlayFile: (file: LibraryFile) => void
 }) {
   const isFolder = item.type === 'folder'
+  const progress = mockProgress(item)
   const { ref, focused } = useFocusable({
     scrollMode: 'nearest',
     onSelect: () => {
@@ -129,14 +145,24 @@ function Row({
       ref={ref}
       className={`lib-row${focused ? ' lib-row--focused' : ''}`}
     >
-      <span className="lib-row__icon" aria-hidden>
-        {isFolder ? <FolderIcon /> : <FileIcon />}
-      </span>
-      <span className="lib-row__name">{item.name}</span>
-      {!isFolder && item.sizeFormatted && (
-        <span className="lib-row__meta">
-          <span className="lib-row__size">{item.sizeFormatted}</span>
+      <div className="lib-row__content">
+        <span className="lib-row__icon" aria-hidden>
+          {isFolder ? <FolderIcon /> : <FileIcon />}
         </span>
+        <span className="lib-row__name">{item.name}</span>
+        {!isFolder && item.sizeFormatted && (
+          <span className="lib-row__meta">
+            <span className="lib-row__size">{item.sizeFormatted}</span>
+          </span>
+        )}
+      </div>
+      {progress > 0 && (
+        <div className="lib-row__progress" aria-hidden>
+          <div
+            className="lib-row__progress-fill"
+            style={{ width: `${Math.max(2, progress * 100)}%` }}
+          />
+        </div>
       )}
     </div>
   )
