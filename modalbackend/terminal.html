@@ -157,7 +157,7 @@
     <header class="header">
       <div class="header-title">Terminal</div>
       <div class="header-right">
-        <button class="btn" onclick="clearAndRedraw()">Clear</button>
+        <button class="btn" onclick="clearAndRedraw()">CLEAR</button>
         <button id="reconnect-btn" class="btn" onclick="reconnect()">Reconnect</button>
         <div id="status" class="status" data-state="connecting">Connecting</div>
       </div>
@@ -452,7 +452,10 @@
 
     function clearAndRedraw() {
       if (!state.term) return;
-      sendMessage('input', { data: '\x0c' });
+      // Clear the xterm buffer client-side rather than sending Ctrl-L (\x0c) to
+      // the PTY. Some interactive CLIs bind Ctrl-L to their own action, so a
+      // real keystroke would trigger the tool instead of clearing the screen.
+      state.term.clear();
       state.term.focus();
     }
 

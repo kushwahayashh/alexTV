@@ -65,7 +65,11 @@ def add_terminal_routes(api_app, touch=None) -> None:
                 os.chdir(MOUNT_PATH if os.path.exists(MOUNT_PATH) else "/")
 
             env = os.environ.copy()
-            env["PATH"] = f"/root/.local/bin:{env.get('PATH', '')}"
+            # HOME is set to /vol/.home at container startup so tool configs
+            # (yt-dlp, aria2, git, shell history) persist across restarts. It's
+            # inherited here via environ.copy(); keep .local/bin on PATH for
+            # pip-installed user binaries.
+            env["PATH"] = f"{env.get('HOME', '/root')}/.local/bin:{env.get('PATH', '')}"
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
             env["LANG"] = os.environ.get("LANG", "en_US.UTF-8")

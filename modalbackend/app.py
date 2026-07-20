@@ -53,6 +53,11 @@ APP_NAME = "alextv-library"
 MOUNT_PATH = "/vol"
 # The Library only ever browses inside the media folder, never the whole volume.
 MEDIA_ROOT = Path(MOUNT_PATH).resolve() / "media"
+# The container's own $HOME (/root) is wiped on every restart, so tool state
+# written there (yt-dlp/aria2 config, shell history, git config, pi-coding-agent
+# state) is lost. Point HOME at this volume-backed dir so it persists instead.
+# It lives outside MEDIA_ROOT, so the Library never lists it.
+HOME_ROOT = Path(MOUNT_PATH).resolve() / ".home"
 
 # Extensions we surface as playable media. Anything else is hidden from /list so
 # the Library stays a clean movie/series browser.
@@ -486,6 +491,11 @@ if modal is not None:
     @modal.web_server(8000, startup_timeout=60)
     def start():
         os.makedirs(MEDIA_ROOT, exist_ok=True)
+        # Persist HOME on the volume so tool configs survive restarts. Set it in
+        # the process env before anything spawns so uvicorn and every terminal
+        # subprocess inherit it.
+        os.makedirs(HOME_ROOT, exist_ok=True)
+        os.environ["HOME"] = str(HOME_ROOT)
         import uvicorn
 
         activity = _ActivityTracker()
