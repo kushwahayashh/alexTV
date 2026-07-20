@@ -315,6 +315,9 @@ class _BreadcrumbState extends State<_Breadcrumb> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             curve: Curves.easeOut,
+            // Span the full content width like the React crumbbar (a block-level
+            // flex container), rather than shrinking to the trail's width.
+            width: double.infinity,
             transformAlignment: Alignment.center,
             transform: focused
                 ? (Matrix4.identity()..scaleByDouble(1.015, 1.015, 1.015, 1.0))

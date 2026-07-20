@@ -57,18 +57,20 @@ class _HeaderButtonState extends State<HeaderButton> {
         onTap: widget.onSelect,
         // No pill container — just an animated underline that scales in on
         // focus. Mirrors the React navbar style (an ::after underline sized to
-        // the label width). IntrinsicWidth gives the Column a bounded width
-        // (the label's) so CrossAxisAlignment.stretch has a finite width to
-        // stretch the 2px underline to — without it, the Row hands the Column
-        // an infinite maxWidth and stretch throws a layout assertion.
+        // the label width). A Stack sizes to the Text, and the Positioned
+        // underline (left/right/bottom: 0) stretches to that width — the direct
+        // analogue of React's `::after { left: 4px; right: 4px }`. This avoids
+        // IntrinsicWidth, whose width is measured with the fallback font before
+        // google_fonts loads; once the wider real font swaps in, the label no
+        // longer fits the pre-measured box and wraps ("Sear\nch").
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-          child: IntrinsicWidth(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
+          child: Stack(
+            children: [
+              Padding(
+                // Room for the 2px underline below the label.
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
                   widget.label,
                   style: const TextStyle(
                     fontSize: 16,
@@ -76,15 +78,19 @@ class _HeaderButtonState extends State<HeaderButton> {
                     color: AppColors.text,
                   ),
                 ),
-                const SizedBox(height: 4),
-                AnimatedScale(
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: AnimatedScale(
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOut,
                   scale: focused ? 1 : 0,
                   child: Container(height: 2, color: AppColors.text),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
