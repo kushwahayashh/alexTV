@@ -56,29 +56,35 @@ class _HeaderButtonState extends State<HeaderButton> {
       child: GestureDetector(
         onTap: widget.onSelect,
         // No pill container — just an animated underline that scales in on
-        // focus. Mirrors the React navbar style.
+        // focus. Mirrors the React navbar style (an ::after underline sized to
+        // the label width). IntrinsicWidth gives the Column a bounded width
+        // (the label's) so CrossAxisAlignment.stretch has a finite width to
+        // stretch the 2px underline to — without it, the Row hands the Column
+        // an infinite maxWidth and stretch throws a layout assertion.
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                widget.label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.text,
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  widget.label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              AnimatedScale(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOut,
-                scale: focused ? 1 : 0,
-                child: Container(height: 2, color: AppColors.text),
-              ),
-            ],
+                const SizedBox(height: 4),
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOut,
+                  scale: focused ? 1 : 0,
+                  child: Container(height: 2, color: AppColors.text),
+                ),
+              ],
+            ),
           ),
         ),
       ),
