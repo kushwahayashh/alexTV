@@ -47,8 +47,11 @@ class Hero extends StatelessWidget {
           // Scrim: left-to-right + bottom-up fade to the page background.
           const Scrim(),
           // Content, also fade-in per title.
+          // Content, also fade-in per title. Left edge clears the collapsed
+          // sidebar (sidebarContentPad) so the title/poster never sits under
+          // the rail — matches the web `left: 92px`.
           Positioned(
-            left: AppSizes.pagePadding,
+            left: AppSizes.sidebarContentPad,
             bottom: 112,
             width: MediaQuery.of(context).size.width * 0.46,
             child: FadeIn(

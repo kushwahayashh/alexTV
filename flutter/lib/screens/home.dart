@@ -2,10 +2,9 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart' as api;
-import '../components/header_button.dart';
 import '../components/hero.dart' as ui;
 import '../components/rail.dart';
-import '../components/update_button.dart';
+import '../components/sidebar.dart';
 import '../focus/focus_engine.dart';
 import '../main.dart' show openDetails, openSearch, openLibrary, routeObserver;
 import '../theme.dart';
@@ -138,71 +137,61 @@ class _HomeState extends State<Home> with RouteAware {
       case _Status.error:
         return const _ScreenMsg('Failed to load. Check the network / API key.');
       case _Status.ready:
-        return SingleChildScrollView(
-          controller: _pageController,
-          physics: const ClampingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Hero with header buttons overlaid: Search + Library on the
-              // top-left, Update on the top-right. Keeping them inside the
-              // scroll content means they scroll away with the hero.
-              Stack(
+        // Wire sidebar items to real handlers. Home is the active screen so
+        // Home is a no-op; the rest are placeholders pending their own screens.
+        final navItems = withHandlers({
+          NavId.search: () => openSearch(context),
+          NavId.library: () => openLibrary(context),
+        });
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _pageController,
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ui.Hero(
                     media: _featured.isNotEmpty ? _featured[_heroIndex] : null,
                   ),
-                  Positioned(
-                    top: 24,
-                    left: AppSizes.pagePadding,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        HeaderButton(label: 'Home', onFocused: _releaseToTop),
-                        const SizedBox(width: 12),
-                        HeaderButton(
-                          label: 'Search',
-                          onFocused: _releaseToTop,
-                          onSelect: () => openSearch(context),
-                        ),
-                        const SizedBox(width: 12),
-                        HeaderButton(
-                          label: 'Library',
-                          onFocused: _releaseToTop,
-                          onSelect: () => openLibrary(context),
-                        ),
-                      ],
+                  // Pull the rails up into the base of the hero (margin-top: -80).
+                  // Inset the rails column by the sidebar gutter so the rail
+                  // titles/first posters clear the collapsed sidebar (the rest
+                  // of the row scrolls under it, like the web mask).
+                  Transform.translate(
+                    offset: const Offset(0, -AppSizes.railsOverlap),
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        left: AppSizes.sidebarContentPad - AppSizes.pagePadding,
+                        bottom: 64,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final rail in _rails) ...[
+                            Rail(
+                              rail: rail,
+                              pageController: _pageController,
+                              onSelect: (m) => openDetails(context, m),
+                            ),
+                            const SizedBox(height: AppSizes.railGap),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    top: 24,
-                    right: AppSizes.pagePadding,
-                    child: UpdateButton(onFocused: _releaseToTop),
                   ),
                 ],
               ),
-              // Pull the rails up into the base of the hero (margin-top: -80).
-              Transform.translate(
-                offset: const Offset(0, -AppSizes.railsOverlap),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 64),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final rail in _rails) ...[
-                        Rail(
-                          rail: rail,
-                          pageController: _pageController,
-                          onSelect: (m) => openDetails(context, m),
-                        ),
-                        const SizedBox(height: AppSizes.railGap),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            // Fixed left sidebar overlaying the hero. Lives inside the
+            // FocusScopeProvider so its items register with Home's controller.
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Sidebar(items: navItems),
+            ),
+          ],
         );
     }
   }

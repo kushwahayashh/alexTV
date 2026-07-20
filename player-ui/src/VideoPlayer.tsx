@@ -110,6 +110,29 @@ function fmtTime(sec: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+// Inline icons for the top-bar controls. 24px viewBox, currentColor so they
+// pick up the button's text color (and invert on focus with the circle button).
+function SubtitlesIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="6" y="13" width="5" height="2" rx="1" fill="currentColor" />
+      <rect x="13" y="13" width="5" height="2" rx="1" fill="currentColor" />
+      <rect x="6" y="9" width="8" height="2" rx="1" fill="currentColor" />
+      <rect x="16" y="9" width="2" height="2" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function AudioIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M16.083 2h-4.083a1 1 0 0 0 -1 1v11.5a1.5 1.5 0 1 1 -2.519 -1.1l.12 -.1a1 1 0 0 0 .399 -.8v-4.326a1 1 0 0 0 -1.23 -.974a7.5 7.5 0 0 0 1.73 14.8l.243 -.005a7.5 7.5 0 0 0 7.257 -7.495v-2.7l.311 .153c1.122 .53 2.333 .868 3.59 .993a1 1 0 0 0 1.099 -.996v-4.033a1 1 0 0 0 -.834 -.986a5.005 5.005 0 0 1 -4.097 -4.096a1 1 0 0 0 -.986 -.835z" />
+    </svg>
+  )
+}
+
 export function VideoPlayer({
   title,
   duration,
@@ -406,24 +429,27 @@ export function VideoPlayer({
       {/* Top bar */}
       <div className={`player-top${controlsVisible ? '' : ' player-top--hidden'}`}>
         <div className="player-top__title">{title}</div>
-        <div className="player-top__actions">
-          <button
-            className={`player-pill-btn${focused === 'subtitles' ? ' player-pill-btn--focused' : ''}`}
-            type="button"
-          >
-            Subtitles
-          </button>
-          <button
-            className={`player-pill-btn${focused === 'audio' ? ' player-pill-btn--focused' : ''}`}
-            type="button"
-          >
-            Audio
-          </button>
-        </div>
       </div>
 
       {/* Bottom bar */}
       <div className={`player-bottom${controlsVisible ? '' : ' player-bottom--hidden'}`}>
+        {/* Icon controls, right-aligned above the seek bar */}
+        <div className="player-controls">
+          <button
+            className={`player-circle-btn${focused === 'subtitles' ? ' player-circle-btn--focused' : ''}`}
+            type="button"
+            aria-label="Subtitles"
+          >
+            <SubtitlesIcon />
+          </button>
+          <button
+            className={`player-circle-btn${focused === 'audio' ? ' player-circle-btn--focused' : ''}`}
+            type="button"
+            aria-label="Audio"
+          >
+            <AudioIcon />
+          </button>
+        </div>
         <div className="player-seek">
           <div
             className={`player-seek__bar${focused === 'seek' ? ' player-seek__bar--focused' : ''}`}

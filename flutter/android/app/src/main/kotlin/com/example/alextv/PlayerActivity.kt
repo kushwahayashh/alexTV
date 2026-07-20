@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -68,11 +69,17 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -374,17 +381,18 @@ private fun textOptions(tracks: Tracks, webLabels: Set<String>): List<TextTrackO
  *
  * The Compose overlay mirrors the React player-ui (player-ui/) 1:1:
  *
- *   Top bar:    [title]              [Subtitles] [Audio]
- *   Bottom bar: [seekbar]
+ *   Top bar:    [title]
+ *   Bottom bar:                      [Subtitles] [Audio]
+ *               [seekbar]
  *               [current time            total time]
  *
  * Focus model (D-pad):
  *   Row 0: [subtitles] [audio]   Row 1: [seek]
- *   - Up/Down moves between rows (pills are above the seekbar).
+ *   - Up/Down moves between rows (icon buttons are above the seekbar).
  *   - Left/Right on the seekbar seeks +-10s (intercepted, no focus move).
- *   - Left/Right on the pill row moves between the two pills.
+ *   - Left/Right on the icon row moves between the two buttons.
  *   - Enter on the seekbar toggles play/pause.
- *   - Enter on a pill opens its menu (Subtitles / Audio) — a modal picker with
+ *   - Enter on an icon opens its menu (Subtitles / Audio) — a modal picker with
  *     the same UI as the main app's quality picker, using mock tracks.
  *   - Back closes the open menu first, otherwise closes the player.
  *   Controls auto-hide after 4s; any key resurfaces them.
@@ -906,7 +914,7 @@ private fun ControlsOverlay(
     )
 
     Box(Modifier.fillMaxSize()) {
-        // ---- Top bar: title (left) + Subtitles/Audio pills (right) ----
+        // ---- Top bar: title only (controls moved to bottom bar) ----
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -937,26 +945,6 @@ private fun ControlsOverlay(
                 ),
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(14.dp))
-            PillButton(
-                label = "Subtitles",
-                focusRequester = subFocus,
-                onClick = { onOpenMenu(MenuKind.SUBTITLES) },
-                modifier = Modifier.focusProperties {
-                    down = seekFocus
-                    right = audioFocus
-                },
-            )
-            Spacer(Modifier.width(14.dp))
-            PillButton(
-                label = "Audio",
-                focusRequester = audioFocus,
-                onClick = { onOpenMenu(MenuKind.AUDIO) },
-                modifier = Modifier.focusProperties {
-                    down = seekFocus
-                    left = subFocus
-                },
-            )
         }
 
         // ---- Bottom bar: seek + timestamps, gradient bottom->top ----
@@ -972,6 +960,37 @@ private fun ControlsOverlay(
                 )
                 .padding(horizontal = 40.dp, vertical = 28.dp),
         ) {
+            // Icon controls, right-aligned above the seek bar.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    icon = PlayerIcon.SUBTITLES,
+                    contentDescription = "Subtitles",
+                    focusRequester = subFocus,
+                    onClick = { onOpenMenu(MenuKind.SUBTITLES) },
+                    modifier = Modifier.focusProperties {
+                        down = seekFocus
+                        right = audioFocus
+                    },
+                )
+                Spacer(Modifier.width(14.dp))
+                IconButton(
+                    icon = PlayerIcon.AUDIO,
+                    contentDescription = "Audio",
+                    focusRequester = audioFocus,
+                    onClick = { onOpenMenu(MenuKind.AUDIO) },
+                    modifier = Modifier.focusProperties {
+                        down = seekFocus
+                        left = subFocus
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
             SeekBar(
                 position = position,
                 duration = duration,
@@ -1101,27 +1120,34 @@ private fun SeekBar(
 }
 
 // ----------------------------------------------------------------
-// Pill-shaped button (Subtitles, Audio) — mock menus.
+// Circular icon button (Subtitles, Audio) — mock menus. Mirrors the
+// React player-ui .player-circle-btn: 44dp circle, 22dp icon, inverts
+// color on focus and scales up slightly.
 // ----------------------------------------------------------------
 
+private enum class PlayerIcon { SUBTITLES, AUDIO }
+
 @Composable
-private fun PillButton(
-    label: String,
+private fun IconButton(
+    icon: PlayerIcon,
+    contentDescription: String,
     focusRequester: FocusRequester,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (focused) 1.05f else 1f,
+        targetValue = if (focused) 1.08f else 1f,
         animationSpec = tween(160, easing = FastOutSlowInEasing),
-        label = "pillScale",
+        label = "iconScale",
     )
+    val tint = if (focused) BgColor else TextColor
 
     Box(
         modifier = modifier
             .scale(scale)
-            .clip(RoundedCornerShape(999.dp))
+            .size(44.dp)
+            .clip(CircleShape)
             .background(if (focused) FocusColor else Color.White.copy(alpha = 0.18f))
             .focusRequester(focusRequester)
             .onFocusChanged { focused = it.isFocused }
@@ -1132,17 +1158,61 @@ private fun PillButton(
                 ) {
                     onClick(); true
                 } else false
-            }
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = if (focused) BgColor else TextColor,
-            fontFamily = VarelaRound,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.W700,
+        when (icon) {
+            PlayerIcon.SUBTITLES -> SubtitlesIcon(tint)
+            PlayerIcon.AUDIO -> AudioIcon(tint)
+        }
+    }
+}
+
+// Subtitles icon — outlined CC box with two caption lines. Drawn on a 24-unit
+// grid to match the React SVG viewBox, rendered at 22dp.
+@Composable
+private fun SubtitlesIcon(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        val u = size.width / 24f // one SVG unit in px
+        // Outlined rounded box: x=3 y=5 w=18 h=14 rx=2.5, stroke 2.
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(3f * u, 5f * u),
+            size = Size(18f * u, 14f * u),
+            cornerRadius = CornerRadius(2.5f * u, 2.5f * u),
+            style = Stroke(width = 2f * u),
         )
+        // Caption bars (rounded), matching the SVG's filled rects.
+        fun bar(x: Float, y: Float, w: Float, h: Float) {
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(x * u, y * u),
+                size = Size(w * u, h * u),
+                cornerRadius = CornerRadius(h / 2f * u, h / 2f * u),
+            )
+        }
+        bar(6f, 9f, 8f, 2f)
+        bar(16f, 9f, 2f, 2f)
+        bar(6f, 13f, 5f, 2f)
+        bar(13f, 13f, 5f, 2f)
+    }
+}
+
+// Audio icon — Tabler filled "brand-tiktok" path, ported verbatim from the
+// React player-ui. Parsed from SVG path data on a 24-unit grid, at 22dp.
+private val AudioIconPath: Path = PathParser().parsePathString(
+    "M16.083 2h-4.083a1 1 0 0 0 -1 1v11.5a1.5 1.5 0 1 1 -2.519 -1.1l.12 -.1a1 1 0 0 0 " +
+        ".399 -.8v-4.326a1 1 0 0 0 -1.23 -.974a7.5 7.5 0 0 0 1.73 14.8l.243 -.005a7.5 7.5 " +
+        "0 0 0 7.257 -7.495v-2.7l.311 .153c1.122 .53 2.333 .868 3.59 .993a1 1 0 0 0 1.099 " +
+        "-.996v-4.033a1 1 0 0 0 -.834 -.986a5.005 5.005 0 0 1 -4.097 -4.096a1 1 0 0 0 -.986 -.835z"
+).toPath()
+
+@Composable
+private fun AudioIcon(tint: Color) {
+    Canvas(modifier = Modifier.size(22.dp)) {
+        scale(size.width / 24f, size.height / 24f, pivot = Offset.Zero) {
+            drawPath(AudioIconPath, color = tint)
+        }
     }
 }
 

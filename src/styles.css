@@ -83,7 +83,7 @@ body {
 .home__rails {
   position: relative;
   margin-top: -80px; /* rails overlap the base of the hero */
-  padding: 0 48px 64px;
+  padding: 0 48px 64px 92px; /* left clears the collapsed sidebar */
   display: flex;
   flex-direction: column;
   gap: 34px;
@@ -176,6 +176,102 @@ body {
   }
 }
 
+/* ---------- Sidebar (Netflix/Hotstar-style left rail) ---------- */
+/* Fixed vertical rail overlaying the hero. Collapsed shows icons only; it
+   widens to reveal labels when any item holds focus. Width animates so the
+   expand feels like a hover-out rather than a snap. */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 76px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 0;
+  background: transparent;
+  transition: width 0.22s ease;
+  overflow: hidden;
+}
+.sidebar--expanded {
+  width: 460px;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 2, 2, 0.96) 0%,
+    rgba(2, 2, 2, 0.94) 28%,
+    rgba(2, 2, 2, 0.85) 42%,
+    rgba(2, 2, 2, 0.68) 55%,
+    rgba(2, 2, 2, 0.48) 67%,
+    rgba(2, 2, 2, 0.3) 78%,
+    rgba(2, 2, 2, 0.16) 87%,
+    rgba(2, 2, 2, 0.07) 94%,
+    rgba(2, 2, 2, 0.02) 98%,
+    transparent 100%
+  );
+}
+.sidebar__items {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 0 12px;
+  width: 224px; /* items stay compact; extra sidebar width is fade room only */
+}
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.16s ease;
+}
+.sidebar__item:hover,
+.sidebar__item--focused {
+  color: var(--text);
+}
+/* Animated underline under the label, matching the navbar buttons. */
+.sidebar__label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.16s ease;
+}
+.sidebar__item:hover .sidebar__label::after,
+.sidebar__item--focused .sidebar__label::after {
+  transform: scaleX(1);
+}
+.sidebar__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.sidebar__icon svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+.sidebar__label {
+  position: relative;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.sidebar--expanded .sidebar__label {
+  opacity: 1;
+}
+
 /* ---------- Hero ---------- */
 .hero {
   position: relative;
@@ -212,7 +308,7 @@ body {
 .hero__content {
   position: absolute;
   bottom: 112px;
-  left: 48px;
+  left: 92px; /* clears the collapsed sidebar */
   max-width: 46%;
   z-index: 1;
   animation: heroFade 0.6s ease-out both;
@@ -262,6 +358,11 @@ body {
   margin: -24px -48px;
   scroll-padding: 0 48px;
   scrollbar-width: none;
+  /* Soft-fade the left edge so posters dissolve as they scroll under the
+     collapsed sidebar instead of getting sliced at a hard vertical cut. The
+     fade spans the sidebar zone; the right edge stays fully visible. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 96px);
+  mask-image: linear-gradient(to right, transparent 0, #000 96px);
 }
 .rail__track::-webkit-scrollbar {
   display: none;
@@ -921,7 +1022,7 @@ body {
 .library {
   height: 100vh;
   overflow-y: auto;
-  padding: 24px 48px 64px;
+  padding: 24px 48px 64px 92px; /* left clears the collapsed sidebar */
   /* Keep the nav + breadcrumb in view when a focused row lifts up. */
   scroll-padding-top: 150px;
   scrollbar-width: none;

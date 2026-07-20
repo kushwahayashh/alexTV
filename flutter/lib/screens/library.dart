@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import '../api/library.dart';
-import '../components/header_button.dart';
+import '../components/sidebar.dart';
 import '../focus/focus_engine.dart';
+import '../main.dart' show openSearch;
 import '../theme.dart';
 
 enum _Status { loading, ready, error }
@@ -167,6 +168,13 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Wire sidebar items: Home climbs out of the Library route, Search pushes
+    // the Search screen, Library is a no-op (already on it). The rest are
+    // placeholders pending their own screens.
+    final navItems = withHandlers({
+      NavId.home: () => Navigator.of(context).maybePop(),
+      NavId.search: () => openSearch(context),
+    });
     return PopScope(
       // At root, let Back pop the whole Library route. Drilled into a folder,
       // block the pop and climb to the parent instead — otherwise hardware Back
@@ -184,45 +192,47 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
             focusNode: _keyboardNode,
             autofocus: true,
             onKeyEvent: _handleKey,
-            child: SingleChildScrollView(
-              controller: _pageController,
-              physics: const ClampingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.pagePadding,
-                  24,
-                  AppSizes.pagePadding,
-                  64,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  controller: _pageController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Padding(
+                    // Left clears the collapsed sidebar (sidebarContentPad);
+                    // the rest matches the original Library padding.
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSizes.sidebarContentPad,
+                      24,
+                      AppSizes.pagePadding,
+                      64,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        HeaderButton(
-                          label: 'Home',
-                          onSelect: () => Navigator.of(context).maybePop(),
+                        _Breadcrumb(path: _path, onNavigate: _openFolder),
+                        const SizedBox(height: 20),
+                        _LibraryBody(
+                          status: _status,
+                          listing: _listing,
+                          progress: _progress,
+                          pageController: _pageController,
+                          onOpenFolder: _openFolder,
+                          onPlayFile: _playFile,
                         ),
-                        const SizedBox(width: 12),
-                        const HeaderButton(label: 'Search'),
-                        const SizedBox(width: 12),
-                        const HeaderButton(label: 'Library'),
                       ],
                     ),
-                    _Breadcrumb(path: _path, onNavigate: _openFolder),
-                    const SizedBox(height: 20),
-                    _LibraryBody(
-                      status: _status,
-                      listing: _listing,
-                      progress: _progress,
-                      pageController: _pageController,
-                      onOpenFolder: _openFolder,
-                      onPlayFile: _playFile,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                // Fixed left sidebar overlaying the content. Lives inside the
+                // FocusScopeProvider so its items register with Library's
+                // controller.
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Sidebar(items: navItems),
+                ),
+              ],
             ),
           ),
         ),

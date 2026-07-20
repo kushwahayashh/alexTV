@@ -21,6 +21,15 @@ class AppSizes {
   static const radius = 10.0;
   static const pagePadding = 48.0;
 
+  // Sidebar (Netflix/Hotstar-style left rail). Collapsed shows icons only;
+  // it widens to reveal labels when any item holds focus. The content left
+  // padding is `sidebarCollapsedWidth + 16px` gutter so rails/hero clear it.
+  static const sidebarCollapsedWidth = 76.0;
+  static const sidebarExpandedWidth = 460.0; // includes the right-side fade room
+  static const sidebarItemWidth = 224.0; // items stay compact; rest is fade room
+  static const sidebarContentPad = 92.0; // sidebarCollapsedWidth + 16 gutter
+  static const sidebarFadeWidth = 96.0; // left-edge mask span (matches CSS)
+
   // Poster
   static const posterW = 158.0;
   static const posterH = 237.0;

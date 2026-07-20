@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useFocusable } from '../focus/FocusEngine'
-import { HeaderButton } from '../components/HeaderButton'
+import { Sidebar, withHandlers } from '../components/Sidebar'
 import { Spinner } from '../components/Spinner'
 import {
   fetchLibrary,
@@ -51,13 +51,7 @@ export function Library({
 
   return (
     <div className="library">
-      <div className="library__topbar">
-        <div className="library__nav">
-          <HeaderButton label="Home" onSelect={onGoHome} />
-          <HeaderButton label="Search" />
-          <HeaderButton label="Library" />
-        </div>
-      </div>
+      <Sidebar items={withHandlers({ home: onGoHome })} />
 
       <Breadcrumb path={path} onNavigate={onOpenFolder} />
 

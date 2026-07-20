@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchHomeRails, type Media, type Rail as RailData } from '../api/tmdb'
 import { Hero } from '../components/Hero'
 import { Rail } from '../components/Rail'
-import { HeaderButton } from '../components/HeaderButton'
+import { Sidebar, withHandlers } from '../components/Sidebar'
 import { Spinner } from '../components/Spinner'
 
 const HERO_ROTATE_MS = 10000
@@ -20,6 +20,13 @@ export function Home({
   const [featured, setFeatured] = useState<Media[]>([])
   const [heroIndex, setHeroIndex] = useState(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  // Wire sidebar items to real handlers. Home is the active screen so it's a
+  // no-op; the rest are placeholders pending their own screens.
+  const navItems = withHandlers({
+    search: onOpenSearch,
+    library: onOpenLibrary,
+  })
 
   useEffect(() => {
     let alive = true
@@ -64,16 +71,9 @@ export function Home({
 
   return (
     <div className="home">
+      <Sidebar items={navItems} />
       <div className="home__hero-wrap">
         <Hero media={featured[heroIndex] ?? null} />
-        <div className="home__header home__header--left">
-          <HeaderButton label="Home" />
-          <HeaderButton label="Search" onSelect={onOpenSearch} />
-          <HeaderButton label="Library" onSelect={onOpenLibrary} />
-        </div>
-        <div className="home__header home__header--right">
-          <HeaderButton label="Update" />
-        </div>
       </div>
       <div className="home__rails">
         {rails.map((rail) => (

@@ -38,6 +38,12 @@ type FocusableEntry = {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
+  // Sidebar item: a header that stacks vertically (Netflix/Hotstar-style left
+  // rail). Treated like a header for the hero-release / first-header paths, but
+  // directional nav is rotated: Up/Down walks the rail and Right drops into the
+  // content (Left does nothing). Left from the leftmost content column also
+  // reaches the rail.
+  isSidebar?: boolean
   // Text input: typing, Space, Backspace and Left/Right (caret) pass through to
   // the field; only Up (header) and Down/Enter (into the grid) navigate away.
   isInput?: boolean
@@ -138,12 +144,18 @@ export function FocusProvider({
   const focusIdRef = useRef<string | null>(null)
   focusIdRef.current = focusId
   const headerIdsRef = useRef<Set<string>>(new Set())
+  const sidebarIdsRef = useRef<Set<string>>(new Set())
 
   const setFocus = useCallback((id: string) => {
     if (!entries.current.has(id)) return
     setFocusId(id)
     const entry = entries.current.get(id)
     entry?.onFocus?.()
+    // Sidebar items live in a position:fixed rail that never scrolls, so
+    // scrollIntoView would instead walk up to the nearest scroll container
+    // (.home/.library) and yank the content vertically — causing the hero/
+    // rails to jump when the rail expands. Skip scrolling for rail items.
+    if (entry?.isSidebar) return
     // 'top' entries (hero action buttons) scroll their container fully to the
     // top so the whole hero shows, instead of lifting the button to the edge.
     if (entry?.scrollMode === 'top') {
@@ -212,6 +224,7 @@ export function FocusProvider({
     // No auto-seed: nothing is focused on load so the hero is fully visible.
     entries.current.set(entry.id, entry)
     if (entry.isHeader) headerIdsRef.current.add(entry.id)
+    if (entry.isSidebar) sidebarIdsRef.current.add(entry.id)
   }, [])
 
   // Release focus (back to no selection) and scroll the content container to
@@ -234,6 +247,7 @@ export function FocusProvider({
   const unregister = useCallback((id: string) => {
     entries.current.delete(id)
     headerIdsRef.current.delete(id)
+    sidebarIdsRef.current.delete(id)
   }, [])
 
   const setActive = useCallback((id: string, active: boolean) => {
@@ -300,6 +314,49 @@ export function FocusProvider({
     [],
   )
 
+  // First sidebar item in document order — where focus enters when content
+  // reaches sideways for the rail (Left from the leftmost column).
+  const firstSidebar = useCallback((): FocusableEntry | null => {
+    let first: FocusableEntry | null = null
+    for (const id of sidebarIdsRef.current) {
+      const e = entries.current.get(id)
+      if (!e) continue
+      const r = rectOf(e.element)
+      if (r.width <= 0 && r.height <= 0) continue
+      if (
+        !first ||
+        e.element.compareDocumentPosition(first.element) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ) {
+        first = e
+      }
+    }
+    return first
+  }, [])
+
+  // Next sidebar item above/below the current one in the vertical rail.
+  const nextSidebar = useCallback(
+    (currentId: string, dir: 'up' | 'down'): string | null => {
+      const cur = entries.current.get(currentId)
+      if (!cur) return null
+      const from = rectOf(cur.element)
+      let best: { id: string; cost: number } | null = null
+      for (const id of sidebarIdsRef.current) {
+        if (id === currentId) continue
+        const e = entries.current.get(id)
+        if (!e) continue
+        const to = rectOf(e.element)
+        if (to.width <= 0 && to.height <= 0) continue
+        const dy = to.cy - from.cy
+        if (dir === 'up' ? dy >= -1 : dy <= 1) continue
+        const cost = Math.abs(dy)
+        if (!best || cost < best.cost) best = { id, cost }
+      }
+      return best?.id ?? null
+    },
+    [],
+  )
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const dirMap: Record<string, Direction> = {
@@ -333,6 +390,23 @@ export function FocusProvider({
         }
 
         e.preventDefault()
+
+        // Sidebar item focused: Up/Down walks the vertical rail, Right drops
+        // into the content (hero first if there is one), Left is a no-op.
+        if (curAlive && sidebarIdsRef.current.has(cur!)) {
+          if (dir === 'up' || dir === 'down') {
+            const next = nextSidebar(cur!, dir)
+            if (next) setFocus(next)
+          } else if (dir === 'right') {
+            if (heroVisible()) {
+              releaseToTop()
+            } else {
+              const first = firstInDomOrder()
+              if (first) setFocus(first.id)
+            }
+          }
+          return
+        }
 
         // Header focused: left/right moves between headers. Down drops into the
         // hero when there is one; otherwise straight into the content grid.
@@ -375,6 +449,11 @@ export function FocusProvider({
             const first = firstHeader()
             if (first) setFocus(first.id)
           }
+        } else if (dir === 'left') {
+          // Nothing to the left of the first column. If a sidebar rail is
+          // present, jump into it (Hotstar/Netflix-style left rail).
+          const sb = firstSidebar()
+          if (sb) setFocus(sb.id)
         }
         return
       }
@@ -411,6 +490,8 @@ export function FocusProvider({
     releaseToTop,
     firstHeader,
     nextHeader,
+    firstSidebar,
+    nextSidebar,
     heroVisible,
   ])
 
@@ -424,12 +505,24 @@ export function FocusProvider({
 let idCounter = 0
 
 /**
+ * Read the live focus id from inside a FocusProvider. Used by components that
+ * need to react to which focusable is currently active (e.g. a sidebar that
+ * expands when any of its items holds focus).
+ */
+export function useFocusId(): string | null {
+  const ctx = useContext(FocusContext)
+  if (!ctx) throw new Error('useFocusId must be used within a FocusProvider')
+  return ctx.focusId
+}
+
+/**
  * Register a focusable node. Returns a ref to attach and whether it is focused.
  */
 export function useFocusable(opts?: {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
+  isSidebar?: boolean
   isInput?: boolean
   scrollMode?: 'start' | 'top' | 'nearest'
   active?: boolean
@@ -464,6 +557,7 @@ export function useFocusable(opts?: {
       onSelect: () => optsRef.current?.onSelect?.(),
       onFocus: () => optsRef.current?.onFocus?.(),
       isHeader: optsRef.current?.isHeader,
+      isSidebar: optsRef.current?.isSidebar,
       isInput: optsRef.current?.isInput,
       scrollMode: optsRef.current?.scrollMode,
       active: optsRef.current?.active !== false,

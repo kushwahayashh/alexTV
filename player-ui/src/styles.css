@@ -100,6 +100,14 @@ body {
   pointer-events: none;
 }
 
+/* Icon controls row, right-aligned above the seek bar */
+.player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
 /* ---------- Seek bar ---------- */
 .player-seek {
   display: flex;

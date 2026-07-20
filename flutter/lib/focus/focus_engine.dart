@@ -18,6 +18,12 @@ class _Entry {
   final VoidCallback?
   onFocused; // scrolls itself into view, like scrollIntoView
   final bool isHeader; // top bar (e.g. Update button), reached by Up from hero
+  // Sidebar item: a header that stacks vertically (Netflix/Hotstar-style left
+  // rail). Treated like a header for the hero-release / first-header paths, but
+  // directional nav is rotated: Up/Down walks the rail and Right drops into the
+  // content (Left does nothing). Left from the leftmost content column also
+  // reaches the rail.
+  final bool isSidebar;
   final bool isInput;
   bool active;
   _Entry(
@@ -26,6 +32,7 @@ class _Entry {
     this.onSelect,
     this.onFocused,
     this.isHeader,
+    this.isSidebar,
     this.isInput,
     this.active,
   );
@@ -44,6 +51,7 @@ class FocusController extends ChangeNotifier {
   final _entries = <int, _Entry>{};
   int? _focusId;
   final _headerIds = <int>{}; // all header focusables
+  final _sidebarIds = <int>{}; // all sidebar rail focusables
   int _counter = 0;
 
   int? get focusId => _focusId;
@@ -53,6 +61,7 @@ class FocusController extends ChangeNotifier {
     VoidCallback? onSelect,
     VoidCallback? onFocused,
     bool isHeader = false,
+    bool isSidebar = false,
     bool isInput = false,
     bool active = true,
   }) {
@@ -63,10 +72,12 @@ class FocusController extends ChangeNotifier {
       onSelect,
       onFocused,
       isHeader,
+      isSidebar,
       isInput,
       active,
     );
     if (isHeader) _headerIds.add(id);
+    if (isSidebar) _sidebarIds.add(id);
     return id;
   }
 
@@ -83,6 +94,7 @@ class FocusController extends ChangeNotifier {
   void unregister(int id) {
     _entries.remove(id);
     _headerIds.remove(id);
+    _sidebarIds.remove(id);
   }
 
   void _setFocus(int id) {
@@ -90,6 +102,11 @@ class FocusController extends ChangeNotifier {
     if (entry == null || !entry.active) return;
     _focusId = id;
     notifyListeners();
+    // Sidebar items live in a fixed-position rail that never scrolls, so
+    // scrolling would instead walk up to the nearest scroll container
+    // (Home/Library) and yank the content vertically — causing the hero/
+    // rails to jump when the rail expands. Skip scrolling for rail items.
+    if (entry.isSidebar) return;
     // Defer so the newly-focused widget has laid out before it scrolls itself in.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _entries[id]?.onFocused?.call();
@@ -163,6 +180,47 @@ class FocusController extends ChangeNotifier {
       final dx = to.center.dx - fc.dx;
       if (dir == Direction.left ? dx >= -1 : dx <= 1) continue;
       final cost = dx.abs();
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestId = id;
+      }
+    }
+    return bestId;
+  }
+
+  /// First sidebar item in document order — where focus enters when content
+  /// reaches sideways for the rail (Left from the leftmost column). "Document
+  /// order" here is registration order, which matches the visual top-to-bottom
+  /// order of the rail.
+  int? _firstSidebar() {
+    for (final id in _sidebarIds) {
+      final e = _entries[id];
+      if (e == null || !e.active) continue;
+      final r = e.rect;
+      if (r == null || r.isEmpty) continue;
+      return id;
+    }
+    return null;
+  }
+
+  /// Next sidebar item above/below the current one in the vertical rail.
+  int? _nextSidebar(int currentId, Direction dir) {
+    final current = _entries[currentId];
+    final from = current?.rect;
+    if (from == null) return null;
+    final fc = from.center;
+
+    int? bestId;
+    double bestCost = double.infinity;
+    for (final id in _sidebarIds) {
+      if (id == currentId) continue;
+      final e = _entries[id];
+      if (e == null || !e.active) continue;
+      final to = e.rect;
+      if (to == null || to.isEmpty) continue;
+      final dy = to.center.dy - fc.dy;
+      if (dir == Direction.up ? dy >= -1 : dy <= 1) continue;
+      final cost = dy.abs();
       if (cost < bestCost) {
         bestCost = cost;
         bestId = id;
@@ -251,6 +309,25 @@ class FocusController extends ChangeNotifier {
         return KeyEventResult.handled;
       }
 
+      // Sidebar item focused: Up/Down walks the vertical rail, Right drops
+      // into the content (hero first if there is one), Left is a no-op. Checked
+      // before the header branch because sidebar items are also headers
+      // (isHeader + isSidebar), and the sidebar nav semantics must win.
+      if (curAlive && cur != null && _sidebarIds.contains(cur)) {
+        if (dir == Direction.up || dir == Direction.down) {
+          final next = _nextSidebar(cur, dir);
+          if (next != null) _setFocus(next);
+        } else if (dir == Direction.right) {
+          if (onReleaseTop != null) {
+            clearFocus();
+            onReleaseTop.call();
+          } else {
+            final first = _firstInOrder();
+            if (first != null) _setFocus(first);
+          }
+        }
+        return KeyEventResult.handled;
+      }
       // Header focused: left/right moves between headers. Down drops into the
       // hero when there is one (onReleaseTop set); otherwise — on hero-less
       // screens like Library/Search — straight into the content grid, so it's
@@ -296,6 +373,11 @@ class FocusController extends ChangeNotifier {
           final first = _firstHeader();
           if (first != null) _setFocus(first);
         }
+      } else if (dir == Direction.left) {
+        // Nothing to the left of the first column. If a sidebar rail is
+        // present, jump into it (Hotstar/Netflix-style left rail).
+        final sb = _firstSidebar();
+        if (sb != null) _setFocus(sb);
       }
       return KeyEventResult.handled;
     }
