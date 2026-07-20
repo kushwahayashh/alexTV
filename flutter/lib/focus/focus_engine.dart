@@ -18,11 +18,12 @@ class _Entry {
   final VoidCallback?
   onFocused; // scrolls itself into view, like scrollIntoView
   final bool isHeader; // top bar (e.g. Update button), reached by Up from hero
-  // Sidebar item: a header that stacks vertically (Netflix/Hotstar-style left
-  // rail). Treated like a header for the hero-release / first-header paths, but
-  // directional nav is rotated: Up/Down walks the rail and Right drops into the
-  // content (Left does nothing). Left from the leftmost content column also
-  // reaches the rail.
+  // Sidebar item: the vertical left rail (Netflix/Hotstar-style). It is NOT a
+  // header — it has its own id set (`_sidebarIds`) and its own nav semantics:
+  // Up/Down walks the rail, Right drops into the content, Left is a no-op, and
+  // Left from the leftmost content column reaches it. Like headers, sidebar
+  // items are excluded from the content grid, but they are kept out of
+  // `_headerIds` so the header Left/Right walk never lands on a rail item.
   final bool isSidebar;
   final bool isInput;
   bool active;
@@ -50,9 +51,17 @@ class _Entry {
 class FocusController extends ChangeNotifier {
   final _entries = <int, _Entry>{};
   int? _focusId;
-  final _headerIds = <int>{}; // all header focusables
+  final _headerIds = <int>{}; // plain top-bar headers (NOT sidebar items)
   final _sidebarIds = <int>{}; // all sidebar rail focusables
   int _counter = 0;
+
+  // Rate-limit held-key (auto-repeat) navigation. A discrete press always moves
+  // immediately; while the D-pad is held, moves are capped to one per
+  // [_repeatIntervalMs] so a long list doesn't fly past under the cursor and so
+  // each repeat doesn't trigger an unbounded live-geometry scan every frame.
+  final Stopwatch _navClock = Stopwatch()..start();
+  int _lastRepeatMs = 0;
+  static const int _repeatIntervalMs = 90;
 
   int? get focusId => _focusId;
   bool isFocused(int id) => _focusId == id;
@@ -87,7 +96,10 @@ class FocusController extends ChangeNotifier {
     final entry = _entries[id];
     if (entry == null || entry.active == active) return;
     entry.active = active;
-    if (!active && _focusId == id) _focusId = null;
+    // If the entry that just went inactive held focus, hand focus to the
+    // nearest still-active neighbor instead of leaving nothing focused (a
+    // dead-end until the next key press).
+    if (!active && _focusId == id) _focusId = _nearestActive(id);
     notifyListeners();
   }
 
@@ -95,6 +107,34 @@ class FocusController extends ChangeNotifier {
     _entries.remove(id);
     _headerIds.remove(id);
     _sidebarIds.remove(id);
+    // The focused entry is being torn down (e.g. a Library folder change or a
+    // season switch disposes the old rows). Clear the dangling id so a removed
+    // entry never stays "focused". No notifyListeners here: unregister runs
+    // during dispose, where notifying listeners mid-teardown can fire setState
+    // on a defunct tree. The replacing content requests focus itself (or the
+    // next direction key self-heals via the !curAlive path).
+    if (_focusId == id) _focusId = null;
+  }
+
+  /// Nearest active entry to [id] by center distance — used to relocate focus
+  /// when the focused entry is disabled.
+  int? _nearestActive(int id) {
+    final from = _entries[id]?.rect;
+    if (from == null) return null;
+    final fc = from.center;
+    int? bestId;
+    double bestDist = double.infinity;
+    for (final e in _entries.values) {
+      if (e.id == id || !e.active) continue;
+      final r = e.rect;
+      if (r == null || r.isEmpty) continue;
+      final d = (r.center - fc).distanceSquared;
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = e.id;
+      }
+    }
+    return bestId;
   }
 
   void _setFocus(int id) {
@@ -123,13 +163,29 @@ class FocusController extends ChangeNotifier {
   /// Programmatically focus a registered entry (mirrors the React `focusSelf`).
   void requestFocus(int id) => _setFocus(id);
 
+  /// Focus the first content-grid item, if any. Used to re-seat focus after a
+  /// screen swaps its content out from under the cursor (e.g. a Library folder
+  /// change disposes the focused row): without this the listing shows no focus
+  /// ring until the next direction key self-heals via the `!curAlive` path.
+  /// No-op when the grid is empty, so an empty folder simply shows nothing
+  /// focused rather than grabbing a header/sidebar item.
+  void focusFirstContent() {
+    final first = _firstInOrder();
+    if (first != null) _setFocus(first);
+  }
+
   /// First focusable in visual order (topmost, then leftmost) — where focus
-  /// enters when nothing is focused yet (e.g. pressing Down on the hero).
+  /// enters when nothing is focused yet (e.g. pressing Down on the hero) or
+  /// when a header releases into the content grid. Skips headers and inputs:
+  /// the search text field is the topmost entry but Down from the header pills
+  /// should land on the first result, not the field.
   int? _firstInOrder() {
     _Entry? best;
     Rect? bestR;
     for (final e in _entries.values) {
       if (e.isHeader) continue; // header isn't part of the content grid
+      if (e.isSidebar) continue; // rail is reached via Left / _firstSidebar
+      if (e.isInput) continue; // reached via its own field focus, not the grid
       if (!e.active) continue;
       final r = e.rect;
       if (r == null || r.isEmpty) continue;
@@ -143,8 +199,11 @@ class FocusController extends ChangeNotifier {
     return best?.id;
   }
 
-  /// Leftmost header in document order — where focus enters when pressing Up
-  /// from the hero.
+  /// Leftmost plain header in document order — where focus enters when pressing
+  /// Up toward the top chrome. Falls back to the sidebar rail when a screen has
+  /// no plain top-bar headers (Home/Library), where the sidebar *is* the top
+  /// chrome. This preserves the old behavior from when sidebar items were also
+  /// tagged `isHeader`, without the flag overload.
   int? _firstHeader() {
     _Entry? best;
     Rect? bestR;
@@ -159,7 +218,7 @@ class FocusController extends ChangeNotifier {
         bestR = r;
       }
     }
-    return best?.id;
+    return best?.id ?? _firstSidebar();
   }
 
   /// Next header in the pressed horizontal direction, or null if none.
@@ -240,9 +299,10 @@ class FocusController extends ChangeNotifier {
 
     for (final e in _entries.values) {
       if (e.id == currentId) continue;
-      if (e.isHeader) {
-        continue; // reached only via the explicit Up-from-top path
-      }
+      // Top-bar headers and the sidebar rail are not part of the content grid;
+      // they're reached via their own explicit paths (Up-from-top, Left-to-rail)
+      // and navigated by _nextHeader / _nextSidebar.
+      if (e.isHeader || e.isSidebar) continue;
       if (!e.active) continue;
       final to = e.rect;
       if (to == null || to.isEmpty) continue;
@@ -291,6 +351,20 @@ class FocusController extends ChangeNotifier {
       _ => null,
     };
     if (dir != null) {
+      // A held D-pad key emits a burst of KeyRepeatEvents (one per frame on
+      // some TV firmwares). Each move below runs an O(n) live-geometry scan, so
+      // acting on every repeat both hammers layout and races the cursor past
+      // its target. A discrete press (KeyDownEvent) always moves; repeats are
+      // capped to one move per [_repeatIntervalMs]. Extra repeats are consumed
+      // (handled) so they don't fall through to other handlers.
+      if (event is KeyRepeatEvent) {
+        final now = _navClock.elapsedMilliseconds;
+        if (now - _lastRepeatMs < _repeatIntervalMs) {
+          return KeyEventResult.handled;
+        }
+        _lastRepeatMs = now;
+      }
+
       final cur = _focusId;
       final curEntry = cur == null ? null : _entries[cur];
       final curAlive = curEntry != null && curEntry.active;
@@ -310,9 +384,10 @@ class FocusController extends ChangeNotifier {
       }
 
       // Sidebar item focused: Up/Down walks the vertical rail, Right drops
-      // into the content (hero first if there is one), Left is a no-op. Checked
-      // before the header branch because sidebar items are also headers
-      // (isHeader + isSidebar), and the sidebar nav semantics must win.
+      // into the content (hero first if there is one), Left is a no-op.
+      // _sidebarIds and _headerIds are disjoint sets (sidebar items are no
+      // longer registered as headers), so this branch and the header branch
+      // below never contend for the same entry.
       if (curAlive && cur != null && _sidebarIds.contains(cur)) {
         if (dir == Direction.up || dir == Direction.down) {
           final next = _nextSidebar(cur, dir);
@@ -440,11 +515,13 @@ class FocusScopeProvider extends InheritedNotifier<FocusController> {
   /// Non-subscribing lookup — use in initState/didChangeDependencies for
   /// one-time registration where you don't want to rebuild on focus changes.
   static FocusController read(BuildContext context) {
-    final scope =
-        context
-                .getElementForInheritedWidgetOfExactType<FocusScopeProvider>()!
-                .widget
-            as FocusScopeProvider;
-    return scope.notifier!;
+    final element =
+        context.getElementForInheritedWidgetOfExactType<FocusScopeProvider>();
+    assert(
+      element != null,
+      'No FocusScopeProvider found in context. A focusable widget must be '
+      'built beneath the screen\'s FocusScopeProvider.',
+    );
+    return (element!.widget as FocusScopeProvider).notifier!;
   }
 }

@@ -41,4 +41,11 @@ class AppSizes {
   static const railsOverlap = 80.0; // rails pull up into the hero
   static const heroHeightFactor = 0.94; // 94vh
   static const scrollPaddingTop = 360.0; // lift target for a focused row
+
+  // Focused-row scroll lift: how far below the viewport top a newly focused
+  // row/card is seated after it scrolls itself into view. Screen-specific
+  // because each screen has a different header height above its scroll area.
+  static const episodeRowScrollLift = 286.0; // Details episode list
+  static const libraryRowScrollLift = 150.0; // Library file rows
+  static const searchResultScrollLift = 130.0; // Search result grid
 }

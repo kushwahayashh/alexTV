@@ -25,7 +25,10 @@ class _HomeState extends State<Home> with RouteAware {
 
   List<api.Rail> _rails = [];
   List<api.Media> _featured = [];
-  int _heroIndex = 0;
+  // Hero index lives in a ValueNotifier, not in State, so the 10s rotation only
+  // rebuilds the Hero backdrop via a ValueListenableBuilder — not the whole
+  // screen (rails + every poster viewport), which a setState here would.
+  final _heroIndex = ValueNotifier<int>(0);
   Timer? _rotateTimer;
   _Status _status = _Status.loading;
 
@@ -57,6 +60,7 @@ class _HomeState extends State<Home> with RouteAware {
             .toList();
         _status = _Status.ready;
       });
+      _heroIndex.value = 0;
       _startRotation();
     } catch (e) {
       debugPrint('$e');
@@ -70,7 +74,7 @@ class _HomeState extends State<Home> with RouteAware {
     _rotateTimer?.cancel();
     _rotateTimer = Timer.periodic(
       const Duration(milliseconds: _heroRotateMs),
-      (_) => setState(() => _heroIndex = (_heroIndex + 1) % _featured.length),
+      (_) => _heroIndex.value = (_heroIndex.value + 1) % _featured.length,
     );
   }
 
@@ -103,6 +107,7 @@ class _HomeState extends State<Home> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     _stopRotation();
+    _heroIndex.dispose();
     _pageController.dispose();
     _keyboardNode.dispose();
     _focus.dispose();
@@ -151,8 +156,15 @@ class _HomeState extends State<Home> with RouteAware {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ui.Hero(
-                    media: _featured.isNotEmpty ? _featured[_heroIndex] : null,
+                  // Only the backdrop rebuilds when the hero index rotates; the
+                  // rails below stay put (they don't listen to _heroIndex).
+                  ValueListenableBuilder<int>(
+                    valueListenable: _heroIndex,
+                    builder: (context, index, _) => ui.Hero(
+                      media: _featured.isNotEmpty
+                          ? _featured[index % _featured.length]
+                          : null,
+                    ),
                   ),
                   // Pull the rails up into the base of the hero (margin-top: -80).
                   // Inset the rails column by the sidebar gutter so the rail

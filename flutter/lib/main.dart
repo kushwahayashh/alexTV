@@ -50,19 +50,19 @@ class AlexTvApp extends StatelessWidget {
 /// and focused card all survive the round-trip — Back returns instantly with
 /// no refetch. Fully replaces the old flag-based [_AppShell] cross-fade.
 void openDetails(BuildContext context, api.Media media) {
-  Navigator.of(context).push(fadeRoute(Details(media: media)));
+  pushGuarded(context, fadeRoute(Details(media: media)));
 }
 
 /// Pushes the Search screen. Selecting a result from Search pushes Details on
 /// top, so Back from Details returns to Search, then Back again to Home.
 void openSearch(BuildContext context) {
-  Navigator.of(context).push(fadeRoute(const Search()));
+  pushGuarded(context, fadeRoute(const Search()));
 }
 
 /// Pushes the Library (file-manager) screen. Drilling into folders happens
 /// within the screen; Back climbs folders before popping back to Home.
 void openLibrary(BuildContext context) {
-  Navigator.of(context).push(fadeRoute(const Library()));
+  pushGuarded(context, fadeRoute(const Library()));
 }
 
 /// Lays the app out at a fixed [AppSizes.designWidth] and uniformly scales it

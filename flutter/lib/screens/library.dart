@@ -34,7 +34,11 @@ Future<Map<String, double>> fetchPlaybackProgress(List<String> paths) async {
       if (progress is num) out[path] = progress.toDouble().clamp(0.0, 1.0);
     });
     return out;
-  } catch (_) {
+  } catch (e) {
+    // Progress is a nice-to-have (the fill bars); a native-channel or decode
+    // failure just means no bars, never a broken listing. Log for diagnosis but
+    // fall back to "nothing tracked".
+    debugPrint('fetchPlaybackProgress failed: $e');
     return const {};
   }
 }
@@ -95,6 +99,15 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
       setState(() {
         _listing = data;
         _status = _Status.ready;
+      });
+      // Drilling into a folder disposes the previously focused row, so focus is
+      // left cleared (see FocusController.unregister). Seat it on the first row
+      // of the new listing once the sliver has built it, so the user isn't left
+      // with nothing highlighted. Guarded on "nothing focused" so it never
+      // steals focus from the sidebar rail.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _focus.focusId != null) return;
+        _focus.focusFirstContent();
       });
       _refreshProgress();
     } catch (e) {
@@ -194,34 +207,37 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
             onKeyEvent: _handleKey,
             child: Stack(
               children: [
-                SingleChildScrollView(
+                CustomScrollView(
                   controller: _pageController,
                   physics: const ClampingScrollPhysics(),
-                  child: Padding(
-                    // Left clears the collapsed sidebar (sidebarContentPad);
-                    // the rest matches the original Library padding.
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSizes.sidebarContentPad,
-                      24,
-                      AppSizes.pagePadding,
-                      64,
+                  // Left padding clears the collapsed sidebar
+                  // (sidebarContentPad); the rest matches the original Library
+                  // padding. A CustomScrollView + SliverList.builder lazily
+                  // builds (and registers a focus entry for) only the rows near
+                  // the viewport, so a folder with hundreds of files no longer
+                  // builds every row up front.
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSizes.sidebarContentPad,
+                        24,
+                        AppSizes.pagePadding,
+                        0,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: _Breadcrumb(path: _path, onNavigate: _openFolder),
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _Breadcrumb(path: _path, onNavigate: _openFolder),
-                        const SizedBox(height: 20),
-                        _LibraryBody(
-                          status: _status,
-                          listing: _listing,
-                          progress: _progress,
-                          pageController: _pageController,
-                          onOpenFolder: _openFolder,
-                          onPlayFile: _playFile,
-                        ),
-                      ],
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSizes.sidebarContentPad,
+                        20,
+                        AppSizes.pagePadding,
+                        64,
+                      ),
+                      sliver: _bodySliver(),
                     ),
-                  ),
+                  ],
                 ),
                 // Fixed left sidebar overlaying the content. Lives inside the
                 // FocusScopeProvider so its items register with Library's
@@ -237,6 +253,81 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
           ),
         ),
       ),
+    );
+  }
+
+  /// The listing area as a sliver: a centered spinner while loading, a message
+  /// on error / empty, otherwise a lazily-built list of rows. Using
+  /// [SliverList.builder] means each row (and its focus registration) is created
+  /// only as it scrolls near the viewport, so large folders stay responsive.
+  Widget _bodySliver() {
+    if (_status == _Status.loading) {
+      // The body starts ~84 design units below the top (top padding + header
+      // row + gap). To land the spinner at true screen centre we subtract that
+      // offset twice: the box centre is at offset + (height-2*offset)/2 =
+      // height/2.
+      return SliverToBoxAdapter(
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height - 168,
+          child: const Center(
+            child: CupertinoActivityIndicator(
+              radius: 18,
+              color: AppColors.muted,
+            ),
+          ),
+        ),
+      );
+    }
+    if (_status == _Status.error) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 120),
+          child: Center(
+            child: Text(
+              'Failed to load the library.',
+              style: TextStyle(color: AppColors.muted, fontSize: 18.4),
+            ),
+          ),
+        ),
+      );
+    }
+    final items = _listing?.items ?? const <LibraryItem>[];
+    if (items.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 120),
+          child: Center(
+            child: Text(
+              'This folder is empty.',
+              style: TextStyle(color: AppColors.muted, fontSize: 18.4),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SliverList.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: _LibraryRow(
+            key: ValueKey(switch (item) {
+              FolderItem(:final folder) => folder.path,
+              FileItem(:final file) => file.path,
+            }),
+            item: item,
+            progress: switch (item) {
+              FileItem(:final file) => _progress[file.path] ?? 0.0,
+              _ => 0.0,
+            },
+            pageController: _pageController,
+            onOpenFolder: _openFolder,
+            onPlayFile: _playFile,
+          ),
+        );
+      },
     );
   }
 }
@@ -356,86 +447,6 @@ class _BreadcrumbState extends State<_Breadcrumb> {
   }
 }
 
-class _LibraryBody extends StatelessWidget {
-  final _Status status;
-  final LibraryListing? listing;
-  final Map<String, double> progress;
-  final ScrollController pageController;
-  final void Function(String) onOpenFolder;
-  final void Function(LibraryFile) onPlayFile;
-
-  const _LibraryBody({
-    required this.status,
-    required this.listing,
-    required this.progress,
-    required this.pageController,
-    required this.onOpenFolder,
-    required this.onPlayFile,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (status == _Status.loading) {
-      // The body starts ~84 design units below the top (top padding + header
-      // row + gap). To land the spinner at true screen centre we subtract that
-      // offset twice: the box centre is at offset + (height-2*offset)/2 =
-      // height/2.
-      return SizedBox(
-        height: MediaQuery.of(context).size.height - 168,
-        child: const Center(
-          child: CupertinoActivityIndicator(radius: 18, color: AppColors.muted),
-        ),
-      );
-    }
-    if (status == _Status.error) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 120),
-        child: Center(
-          child: Text(
-            'Failed to load the library.',
-            style: TextStyle(color: AppColors.muted, fontSize: 18.4),
-          ),
-        ),
-      );
-    }
-    final items = listing?.items ?? const [];
-    if (items.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 120),
-        child: Center(
-          child: Text(
-            'This folder is empty.',
-            style: TextStyle(color: AppColors.muted, fontSize: 18.4),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: _LibraryRow(
-              key: ValueKey(switch (item) {
-                FolderItem(:final folder) => folder.path,
-                FileItem(:final file) => file.path,
-              }),
-              item: item,
-              progress: switch (item) {
-                FileItem(:final file) => progress[file.path] ?? 0.0,
-                _ => 0.0,
-              },
-              pageController: pageController,
-              onOpenFolder: onOpenFolder,
-              onPlayFile: onPlayFile,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 class _LibraryRow extends StatefulWidget {
   final LibraryItem item;
   /// Watch-progress fraction (0..1); 0 hides the bar.
@@ -503,7 +514,7 @@ class _LibraryRowState extends State<_LibraryRow> {
     if (!page.hasClients || viewport == null) return;
 
     final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
-    final target = (revealTop - 150).clamp(
+    final target = (revealTop - AppSizes.libraryRowScrollLift).clamp(
       page.position.minScrollExtent,
       page.position.maxScrollExtent,
     );

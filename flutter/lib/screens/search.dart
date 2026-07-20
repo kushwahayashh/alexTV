@@ -42,9 +42,14 @@ class _SearchState extends State<Search> {
     _queryController.addListener(_onQueryChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _keyboardNode.requestFocus();
+      // Focus the field through the engine only. requestFocus sets the engine's
+      // _focusId to the field entry and fires its onFocused hook, which calls
+      // _fieldNode.requestFocus() — so the TextField gets primary focus (for
+      // typing) while the engine still owns navigation. Key events bubble from
+      // _fieldNode up to _keyboardNode.onKeyEvent, so _keyboardNode needs no
+      // explicit request of its own. The old triple-request could let the raw
+      // _fieldNode win the race and bypass the engine's key handler.
       _focus.requestFocus(_fieldId);
-      _fieldNode.requestFocus();
     });
   }
 
@@ -324,7 +329,7 @@ class _SearchPosterCardState extends State<_SearchPosterCard> {
     if (!page.hasClients || viewport == null) return;
 
     final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
-    final target = (revealTop - 130).clamp(
+    final target = (revealTop - AppSizes.searchResultScrollLift).clamp(
       page.position.minScrollExtent,
       page.position.maxScrollExtent,
     );

@@ -27,3 +27,17 @@ Route<T> fadeRoute<T>(Widget page, {bool opaque = true}) {
     ),
   );
 }
+
+/// Push [route], but only if the caller's own route is still the topmost one.
+///
+/// D-pad Select has no natural debounce: a quick double-press (or a held key
+/// that slips a repeat through) fires the same `onSelect` twice, and two bare
+/// `Navigator.push` calls stack two identical routes — the user then has to
+/// press Back twice and sees a double transition. Once the first push starts,
+/// the origin route is no longer `isCurrent`, so the second call is dropped
+/// here. Returns the route's pop result, or null if the push was suppressed.
+Future<T?> pushGuarded<T>(BuildContext context, Route<T> route) {
+  final origin = ModalRoute.of(context);
+  if (origin != null && !origin.isCurrent) return Future<T?>.value(null);
+  return Navigator.of(context).push(route);
+}

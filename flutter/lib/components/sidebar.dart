@@ -73,11 +73,19 @@ class _SidebarState extends State<Sidebar> {
     super.didChangeDependencies();
     if (!_registered) {
       _controller = FocusScopeProvider.read(context);
-      for (final item in widget.items) {
+      for (var i = 0; i < widget.items.length; i++) {
+        // Register a stable indirection, not item.onSelect directly. The engine
+        // captures the onSelect closure once at register time, but the parent
+        // screen (Home/Library) rebuilds withHandlers() — and thus fresh
+        // NavItem.onSelect closures — every build. Reading widget.items[i] at
+        // select time means D-pad Enter always runs the current handler.
         _ids.add(
           _controller.register(
-            onSelect: item.onSelect,
-            isHeader: true,
+            onSelect: () => _selectAt(i),
+            // isSidebar only — NOT isHeader. Sidebar items have their own
+            // directional branch (Up/Down walks the rail, Right drops into
+            // content) and must stay out of _headerIds so _firstHeader /
+            // _nextHeader — which drive the top-bar pill nav — never scan them.
             isSidebar: true,
           ),
         );
@@ -91,6 +99,14 @@ class _SidebarState extends State<Sidebar> {
   void _onFocusChanged() {
     final any = _ids.any(_controller.isFocused);
     if (any != _expanded) setState(() => _expanded = any);
+  }
+
+  /// Invoke the current handler for the item at [index]. Read live from
+  /// `widget.items` (not captured at register time) so a rebuilt handler list
+  /// always fires the latest closure. Guarded against a shrunk list.
+  void _selectAt(int index) {
+    if (index >= widget.items.length) return;
+    widget.items[index].onSelect?.call();
   }
 
   @override

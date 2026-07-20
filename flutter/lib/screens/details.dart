@@ -104,8 +104,9 @@ class _DetailsState extends State<Details> {
         }
       });
       await _loadActiveSeason();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      debugPrint('resolveSeries failed: $e');
       setState(() {
         _seriesError = "This series isn't available to stream right now.";
         _seasons = const [];
@@ -140,8 +141,9 @@ class _DetailsState extends State<Details> {
         _episodes = ordered;
         _playFid ??= ordered.isNotEmpty ? ordered.first.fid : null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      debugPrint('getSeasonFiles failed: $e');
       setState(() => _episodes = const []);
     }
   }
@@ -175,9 +177,10 @@ class _DetailsState extends State<Details> {
   /// player is its own route, Details' key handler stops receiving events while
   /// it's up — no flag needed to mute it.
   void _pushPlayer(Player player) {
-    Navigator.of(
+    pushGuarded(
       context,
-    ).push(fadeRoute(player, opaque: false)).then((_) => _restoreDetailsFocus());
+      fadeRoute(player, opaque: false),
+    )?.then((_) => _restoreDetailsFocus());
   }
 
   void _popPlayer() => Navigator.of(context).pop();
@@ -901,7 +904,7 @@ class _EpisodeRowState extends State<_EpisodeRow> {
     // animateTo would then read a null minScrollExtent and crash.
     if (!page.position.hasContentDimensions) return;
     final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
-    final target = (revealTop - 286).clamp(
+    final target = (revealTop - AppSizes.episodeRowScrollLift).clamp(
       page.position.minScrollExtent,
       page.position.maxScrollExtent,
     );
