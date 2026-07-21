@@ -7,6 +7,7 @@ import '../components/hero.dart' show FadeIn;
 import '../components/fade_image.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
+import '../focus/focusable.dart';
 import '../routes.dart';
 import '../theme.dart';
 
@@ -739,29 +740,10 @@ class _SeasonTab extends StatefulWidget {
   State<_SeasonTab> createState() => _SeasonTabState();
 }
 
-class _SeasonTabState extends State<_SeasonTab> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _SeasonTabState extends State<_SeasonTab> with FocusableState {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(
-        onSelect: widget.onSelect,
-        onFocused: _centerInStrip,
-      );
-      _registered = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
+  int registerFocusable(FocusController controller) =>
+      controller.register(onSelect: widget.onSelect, onFocused: _centerInStrip);
 
   /// Scroll the horizontal season strip so this pill sits at its horizontal
   /// center — mirrors the React `scrollIntoView({ inline: 'center' })` so
@@ -770,7 +752,7 @@ class _SeasonTabState extends State<_SeasonTab> {
   void _centerInStrip() {
     final strip = widget.stripController;
     if (!strip.hasClients || !strip.position.hasContentDimensions) return;
-    final ctx = _controller.keyOf(_id).currentContext;
+    final ctx = focusKey.currentContext;
     if (ctx == null) return;
     final box = ctx.findRenderObject() as RenderBox?;
     final viewport = box == null ? null : RenderAbstractViewport.maybeOf(box);
@@ -789,15 +771,14 @@ class _SeasonTabState extends State<_SeasonTab> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
     final textColor = focused
         ? AppColors.bg
         : widget.active
         ? AppColors.text
         : AppColors.muted;
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: GestureDetector(
         onTap: widget.onSelect,
         child: AnimatedScale(
@@ -859,69 +840,34 @@ class _EpisodeRow extends StatefulWidget {
   State<_EpisodeRow> createState() => _EpisodeRowState();
 }
 
-class _EpisodeRowState extends State<_EpisodeRow> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _EpisodeRowState extends State<_EpisodeRow> with FocusableState {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(
-        onSelect: widget.onSelect,
-        onFocused: _scrollIntoView,
-        active: widget.enabled,
-      );
-      _registered = true;
-    }
-  }
+  int registerFocusable(FocusController controller) => controller.register(
+    onSelect: widget.onSelect,
+    onFocused: _scrollIntoView,
+    active: widget.enabled,
+  );
 
   @override
   void didUpdateWidget(_EpisodeRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_registered && oldWidget.enabled != widget.enabled) {
-      _controller.setActive(_id, widget.enabled);
+    if (oldWidget.enabled != widget.enabled) {
+      focusController.setActive(focusId, widget.enabled);
     }
   }
 
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
-
-  void _scrollIntoView() {
-    final ctx = _controller.keyOf(_id).currentContext;
-    if (ctx == null) return;
-    final box = ctx.findRenderObject() as RenderBox?;
-    if (box == null || !box.attached) return;
-    final viewport = RenderAbstractViewport.maybeOf(box);
-    final page = widget.pageController;
-    if (!page.hasClients || viewport == null) return;
-    // hasClients can be true before first layout sets the scroll dimensions;
-    // animateTo would then read a null minScrollExtent and crash.
-    if (!page.position.hasContentDimensions) return;
-    final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
-    final target = (revealTop - AppSizes.episodeRowScrollLift).clamp(
-      page.position.minScrollExtent,
-      page.position.maxScrollExtent,
-    );
-    page.animateTo(
-      target,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOut,
-    );
-  }
+  void _scrollIntoView() => verticalScrollIntoView(
+    key: focusKey,
+    page: widget.pageController,
+    lift: AppSizes.episodeRowScrollLift,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
     final childColor = focused ? AppColors.bg : AppColors.muted;
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: GestureDetector(
         onTap: widget.enabled ? widget.onSelect : null,
         child: AnimatedContainer(

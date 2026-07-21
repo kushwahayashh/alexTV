@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import '../api/tmdb.dart' as api;
 import '../components/fade_image.dart';
 import '../components/header_button.dart';
 import '../focus/focus_engine.dart';
+import '../focus/focusable.dart';
 import '../main.dart' show openDetails;
 import '../theme.dart';
 
@@ -294,60 +294,27 @@ class _SearchPosterCard extends StatefulWidget {
   State<_SearchPosterCard> createState() => _SearchPosterCardState();
 }
 
-class _SearchPosterCardState extends State<_SearchPosterCard> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _SearchPosterCardState extends State<_SearchPosterCard>
+    with FocusableState {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(
-        onSelect: () => widget.onSelect(widget.media),
-        onFocused: _scrollIntoView,
-      );
-      _registered = true;
-    }
-  }
+  int registerFocusable(FocusController controller) => controller.register(
+    onSelect: () => widget.onSelect(widget.media),
+    onFocused: _scrollIntoView,
+  );
 
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
-
-  void _scrollIntoView() {
-    final ctx = _controller.keyOf(_id).currentContext;
-    if (ctx == null) return;
-    final box = ctx.findRenderObject() as RenderBox?;
-    if (box == null || !box.attached) return;
-
-    final viewport = RenderAbstractViewport.maybeOf(box);
-    final page = widget.pageController;
-    if (!page.hasClients || viewport == null) return;
-
-    final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
-    final target = (revealTop - AppSizes.searchResultScrollLift).clamp(
-      page.position.minScrollExtent,
-      page.position.maxScrollExtent,
-    );
-    page.animateTo(
-      target,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOut,
-    );
-  }
+  void _scrollIntoView() => verticalScrollIntoView(
+    key: focusKey,
+    page: widget.pageController,
+    lift: AppSizes.searchResultScrollLift,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
     final media = widget.media;
 
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: GestureDetector(
         onTap: () => widget.onSelect(media),
         child: AnimatedScale(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
+import '../focus/focusable.dart';
 import '../theme.dart';
 import 'fade_image.dart';
 
@@ -27,32 +28,15 @@ class PosterCard extends StatefulWidget {
   State<PosterCard> createState() => _PosterCardState();
 }
 
-class _PosterCardState extends State<PosterCard> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _PosterCardState extends State<PosterCard> with FocusableState {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(
-        onSelect: () => widget.onSelect(widget.media),
-        onFocused: _scrollIntoView,
-      );
-      _registered = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
+  int registerFocusable(FocusController controller) => controller.register(
+    onSelect: () => widget.onSelect(widget.media),
+    onFocused: _scrollIntoView,
+  );
 
   void _scrollIntoView() {
-    final ctx = _controller.keyOf(_id).currentContext;
+    final ctx = focusKey.currentContext;
     if (ctx == null) return;
     final box = ctx.findRenderObject() as RenderBox?;
     if (box == null || !box.attached) return;
@@ -97,12 +81,11 @@ class _PosterCardState extends State<PosterCard> {
   @override
   Widget build(BuildContext context) {
     // Depend on the controller so this rebuilds when focus changes.
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
     final media = widget.media;
 
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: GestureDetector(
         onTap: () => widget.onSelect(media),
         child: AnimatedScale(

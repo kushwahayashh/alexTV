@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../api/stream.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
+import '../focus/focusable.dart';
 import '../theme.dart';
 
 enum _Phase { loading, files, links, error }
@@ -257,39 +258,26 @@ class _PlayerItem extends StatefulWidget {
   State<_PlayerItem> createState() => _PlayerItemState();
 }
 
-class _PlayerItemState extends State<_PlayerItem> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
+class _PlayerItemState extends State<_PlayerItem> with FocusableState {
+  @override
+  int registerFocusable(FocusController controller) =>
+      controller.register(onSelect: widget.onSelect);
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(onSelect: widget.onSelect);
-      _registered = true;
-      if (widget.autoFocus) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _controller.requestFocus(_id);
-        });
-      }
+  void onRegistered() {
+    if (widget.autoFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        focusController.requestFocus(focusId);
+      });
     }
   }
 
   @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
 
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: AnimatedScale(
         scale: focused ? 1.02 : 1.0,
         duration: const Duration(milliseconds: 160),
@@ -474,34 +462,21 @@ class _ErrorModal extends StatefulWidget {
   State<_ErrorModal> createState() => _ErrorModalState();
 }
 
-class _ErrorModalState extends State<_ErrorModal> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
+class _ErrorModalState extends State<_ErrorModal> with FocusableState {
+  @override
+  int registerFocusable(FocusController controller) =>
+      controller.register(onSelect: widget.onClose);
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(onSelect: widget.onClose);
-      _registered = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _controller.requestFocus(_id);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
+  void onRegistered() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      focusController.requestFocus(focusId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
 
     return _modalShell(
       context,
@@ -520,7 +495,7 @@ class _ErrorModalState extends State<_ErrorModal> {
             ),
           ),
           KeyedSubtree(
-            key: _controller.keyOf(_id),
+            key: focusKey,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,

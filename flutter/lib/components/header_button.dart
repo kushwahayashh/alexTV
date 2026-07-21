@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../focus/focus_engine.dart';
+import '../focus/focusable.dart';
 import '../theme.dart';
 
 /// D-pad navigable pill button for the hero header bar. Registered as a
@@ -21,38 +22,20 @@ class HeaderButton extends StatefulWidget {
   State<HeaderButton> createState() => _HeaderButtonState();
 }
 
-class _HeaderButtonState extends State<HeaderButton> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _HeaderButtonState extends State<HeaderButton> with FocusableState {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(
-        onSelect: widget.onSelect,
-        onFocused: widget.onFocused,
-        isHeader: true,
-      );
-      _registered = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
+  int registerFocusable(FocusController controller) => controller.register(
+    onSelect: widget.onSelect,
+    onFocused: widget.onFocused,
+    isHeader: true,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
 
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: GestureDetector(
         onTap: widget.onSelect,
         // No pill container — just an animated underline that scales in on

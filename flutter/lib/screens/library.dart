@@ -2,11 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import '../api/library.dart';
 import '../components/sidebar.dart';
 import '../focus/focus_engine.dart';
+import '../focus/focusable.dart';
 import '../main.dart' show openSearch;
 import '../theme.dart';
 
@@ -344,33 +344,16 @@ class _Breadcrumb extends StatefulWidget {
   State<_Breadcrumb> createState() => _BreadcrumbState();
 }
 
-class _BreadcrumbState extends State<_Breadcrumb> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _BreadcrumbState extends State<_Breadcrumb> with FocusableState {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(onSelect: _select);
-      _registered = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
+  int registerFocusable(FocusController controller) =>
+      controller.register(onSelect: _select);
 
   void _select() => widget.onNavigate(parentOf(widget.path));
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
 
     final names = widget.path.split('/').where((s) => s.isNotEmpty).toList();
     // Home at the root, then one crumb per folder level.
@@ -410,7 +393,7 @@ class _BreadcrumbState extends State<_Breadcrumb> {
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: KeyedSubtree(
-        key: _controller.keyOf(_id),
+        key: focusKey,
         child: GestureDetector(
           onTap: _select,
           child: AnimatedContainer(
@@ -468,31 +451,12 @@ class _LibraryRow extends StatefulWidget {
   State<_LibraryRow> createState() => _LibraryRowState();
 }
 
-class _LibraryRowState extends State<_LibraryRow> {
-  late FocusController _controller;
-  late int _id;
-  bool _registered = false;
-
+class _LibraryRowState extends State<_LibraryRow> with FocusableState {
   bool get _isFolder => widget.item is FolderItem;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_registered) {
-      _controller = FocusScopeProvider.read(context);
-      _id = _controller.register(
-        onSelect: _select,
-        onFocused: _scrollIntoView,
-      );
-      _registered = true;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.unregister(_id);
-    super.dispose();
-  }
+  int registerFocusable(FocusController controller) =>
+      controller.register(onSelect: _select, onFocused: _scrollIntoView);
 
   void _select() {
     switch (widget.item) {
@@ -503,32 +467,15 @@ class _LibraryRowState extends State<_LibraryRow> {
     }
   }
 
-  void _scrollIntoView() {
-    final ctx = _controller.keyOf(_id).currentContext;
-    if (ctx == null) return;
-    final box = ctx.findRenderObject() as RenderBox?;
-    if (box == null || !box.attached) return;
-
-    final viewport = RenderAbstractViewport.maybeOf(box);
-    final page = widget.pageController;
-    if (!page.hasClients || viewport == null) return;
-
-    final revealTop = viewport.getOffsetToReveal(box, 0.0).offset;
-    final target = (revealTop - AppSizes.libraryRowScrollLift).clamp(
-      page.position.minScrollExtent,
-      page.position.maxScrollExtent,
-    );
-    page.animateTo(
-      target,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOut,
-    );
-  }
+  void _scrollIntoView() => verticalScrollIntoView(
+    key: focusKey,
+    page: widget.pageController,
+    lift: AppSizes.libraryRowScrollLift,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final controller = FocusScopeProvider.of(context);
-    final focused = controller.isFocused(_id);
+    final focused = isFocused;
     final onColor = focused ? AppColors.bg : AppColors.text;
     final metaColor = focused
         ? const Color(0x9E000000)
@@ -540,7 +487,7 @@ class _LibraryRowState extends State<_LibraryRow> {
     };
 
     return KeyedSubtree(
-      key: _controller.keyOf(_id),
+      key: focusKey,
       child: GestureDetector(
         onTap: _select,
         child: AnimatedContainer(
