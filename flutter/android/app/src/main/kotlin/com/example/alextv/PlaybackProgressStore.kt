@@ -27,7 +27,6 @@ object PlaybackProgressStore {
     private const val COMPLETION_RATIO = 0.95
 
     data class Entry(
-        val mediaPath: String,
         val title: String,
         val positionMs: Long,
         val durationMs: Long,
@@ -88,10 +87,6 @@ object PlaybackProgressStore {
         writeEntries(context, entries)
     }
 
-    fun clearAll(context: Context) {
-        writeEntries(context, JSONObject())
-    }
-
     /** Progress for a set of paths, as a JSON object keyed by mediaPath. */
     fun getProgressPayload(context: Context, pathsJson: String): String {
         val result = JSONObject()
@@ -125,7 +120,6 @@ object PlaybackProgressStore {
         if (mediaPath.isBlank()) return null
         val entry = readEntries(context).optJSONObject(mediaPath) ?: return null
         return Entry(
-            mediaPath = mediaPath,
             title = entry.optString("title"),
             positionMs = entry.optLong("positionMs"),
             durationMs = entry.optLong("durationMs"),
@@ -136,7 +130,7 @@ object PlaybackProgressStore {
     private fun shouldClearEntry(positionMs: Long, durationMs: Long): Boolean {
         if (durationMs <= 0L) return false
         val remainingMs = durationMs - positionMs
-        val ratio = if (durationMs > 0L) positionMs.toDouble() / durationMs.toDouble() else 0.0
+        val ratio = positionMs.toDouble() / durationMs.toDouble()
         return remainingMs <= COMPLETION_REMAINING_MS || ratio >= COMPLETION_RATIO
     }
 

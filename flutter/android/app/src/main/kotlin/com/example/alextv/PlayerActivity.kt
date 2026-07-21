@@ -60,7 +60,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -252,9 +251,10 @@ private data class TextTrackOption(
 
 // ---- Real audio track extraction from ExoPlayer ----
 
-// Human label for an audio track: explicit format label -> language display
-// name (en -> "English") -> a numbered fallback.
-private fun audioLabel(format: Format, ordinal: Int): String {
+// Human label for a track: explicit format label -> language display name
+// (en -> "English") -> a numbered "$fallbackPrefix N" fallback. Shared by the
+// audio and text menus (only the fallback prefix differs).
+private fun formatLabel(format: Format, ordinal: Int, fallbackPrefix: String): String {
     format.label?.takeIf { it.isNotBlank() }?.let { return it }
     val lang = format.language
     if (!lang.isNullOrBlank() && lang != C.LANGUAGE_UNDETERMINED) {
@@ -262,7 +262,7 @@ private fun audioLabel(format: Format, ordinal: Int): String {
         val display = loc.displayLanguage
         if (display.isNotBlank()) return display.replaceFirstChar { it.uppercase() }
     }
-    return "Audio ${ordinal + 1}"
+    return "$fallbackPrefix ${ordinal + 1}"
 }
 
 // Meta line: channel layout + codec, e.g. "5.1 · AC3". Either part may be
@@ -310,7 +310,7 @@ private fun audioOptions(tracks: Tracks): List<AudioTrackOption> {
                     trackIndex = i,
                     track = Track(
                         id = "audio-$ordinal",
-                        label = audioLabel(format, ordinal),
+                        label = formatLabel(format, ordinal, "Audio"),
                         meta = audioMeta(format),
                     ),
                     selected = group.isTrackSelected(i),
@@ -323,19 +323,6 @@ private fun audioOptions(tracks: Tracks): List<AudioTrackOption> {
 }
 
 // ---- Real embedded (ORG) text track extraction from ExoPlayer ----
-
-// Human label for a text track: explicit format label -> language display name
-// (en -> "English") -> a numbered fallback.
-private fun textLabel(format: Format, ordinal: Int): String {
-    format.label?.takeIf { it.isNotBlank() }?.let { return it }
-    val lang = format.language
-    if (!lang.isNullOrBlank() && lang != C.LANGUAGE_UNDETERMINED) {
-        val loc = java.util.Locale.forLanguageTag(lang)
-        val display = loc.displayLanguage
-        if (display.isNotBlank()) return display.replaceFirstChar { it.uppercase() }
-    }
-    return "Track ${ordinal + 1}"
-}
 
 // Read the current text tracks. Only selectable (supported) tracks are
 // included; `selected` marks the one currently showing (if any). A track whose
@@ -362,7 +349,7 @@ private fun textOptions(tracks: Tracks, webLabels: Set<String>): List<TextTrackO
                     trackIndex = i,
                     track = Track(
                         id = "sub-$ordinal",
-                        label = if (isWeb) (fmtLabel ?: "English") else textLabel(format, ordinal),
+                        label = if (isWeb) (fmtLabel ?: "English") else formatLabel(format, ordinal, "Track"),
                         meta = if (isWeb) "Web" else "Embedded",
                     ),
                     selected = group.isTrackSelected(i),
@@ -552,13 +539,16 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // Final write: this pauses the player, so the position is frozen here and
+        // can't advance before teardown — no need to persist again in onDestroy.
         persistProgress()
         player?.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        persistProgress()
+        // onStop always runs before onDestroy and already persisted the frozen
+        // position, so no persistProgress() here — just release the player.
         player?.release()
         player = null
     }
@@ -600,7 +590,6 @@ private fun PlayerScreen(
 ) {
     val context = LocalContext.current
     var controlsVisible by remember { mutableStateOf(true) }
-    var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var initialized by remember { mutableStateOf(false) }
     var buffering by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
@@ -628,10 +617,6 @@ private fun PlayerScreen(
     // Player state: READY -> initialized; errors surface the error UI.
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY && !initialized) {
                     initialized = true
@@ -767,7 +752,6 @@ private fun PlayerScreen(
                     ControlsOverlay(
                         title = title,
                         visible = controlsVisible,
-                        isPlaying = isPlaying,
                         position = position,
                         duration = duration,
                         seekFocus = seekFocus,
@@ -792,110 +776,146 @@ private fun PlayerScreen(
             }
 
             // Audio / Subtitles menu — drawn above the controls with a scrim.
-            menuKind?.let { kind ->
-                if (kind == MenuKind.AUDIO) {
-                    // Real audio tracks from ExoPlayer. Selecting one applies a
-                    // TrackSelectionOverride so playback actually switches.
-                    val options = remember(currentTracks) { audioOptions(currentTracks) }
-                    val sections = remember(options) {
-                        val rows = if (options.isEmpty()) {
-                            listOf(Track("audio-none", "Default", ""))
-                        } else {
-                            options.map { it.track }
-                        }
-                        listOf(MenuSection("Audio Tracks", rows))
-                    }
-                    val selectedIdx = options.indexOfFirst { it.selected }.coerceAtLeast(0)
-                    MenuOverlay(
-                        sections = sections,
-                        selectedIndex = selectedIdx,
-                        onSelect = { idx ->
-                            options.getOrNull(idx)?.let { opt ->
-                                player.trackSelectionParameters =
-                                    player.trackSelectionParameters
-                                        .buildUpon()
-                                        .setOverrideForType(
-                                            TrackSelectionOverride(opt.group, opt.trackIndex)
-                                        )
-                                        .build()
-                            }
-                        },
-                        onDismiss = { dismissMenu() },
-                    )
-                } else {
-                    // Subtitles menu. ORG subs = embedded text tracks (with a
-                    // leading "Off" row); WebSubs = sideloaded FebBox tracks.
-                    // Selecting either applies a TrackSelectionOverride (both are
-                    // real text tracks); Off disables the text type. The flat menu
-                    // index maps to: 0 = Off, then ORG tracks, then WebSubs tracks.
-                    val textTracks = remember(currentTracks, webSubLabels) {
-                        textOptions(currentTracks, webSubLabels)
-                    }
-                    val orgOpts = remember(textTracks) { textTracks.filter { !it.isWeb } }
-                    val webOpts = remember(textTracks) { textTracks.filter { it.isWeb } }
-                    // Selectable tracks in menu order (after the Off row).
-                    val ordered = remember(orgOpts, webOpts) { orgOpts + webOpts }
-
-                    val sections = remember(orgOpts, webOpts) {
-                        val org = buildList {
-                            add(Track("sub-off", "Off", ""))
-                            addAll(orgOpts.map { it.track })
-                        }
-                        val web = if (webOpts.isEmpty()) {
-                            listOf(Track("web-none", "None", ""))
-                        } else {
-                            webOpts.map { it.track }
-                        }
-                        listOf(MenuSection("ORG subs", org), MenuSection("WebSubs", web))
-                    }
-
-                    // Check follows real selection: an active track -> its row
-                    // (offset by the Off row); otherwise Off (index 0).
-                    val activeIdx = ordered.indexOfFirst { it.selected }
-                    val selectedIdx = if (activeIdx >= 0) activeIdx + 1 else 0
-
-                    fun applyOff() {
-                        player.trackSelectionParameters =
-                            player.trackSelectionParameters.buildUpon()
-                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-                                .build()
-                    }
-                    fun applyTrack(opt: TextTrackOption) {
-                        player.trackSelectionParameters =
-                            player.trackSelectionParameters.buildUpon()
-                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                                .setOverrideForType(
-                                    TrackSelectionOverride(opt.group, opt.trackIndex)
-                                )
-                                .build()
-                    }
-
-                    MenuOverlay(
-                        sections = sections,
-                        selectedIndex = selectedIdx,
-                        onSelect = { idx ->
-                            when {
-                                idx == 0 -> applyOff()
-                                idx <= ordered.size -> applyTrack(ordered[idx - 1])
-                                // "None" placeholder in an empty WebSubs section.
-                                else -> Unit
-                            }
-                        },
-                        onDismiss = { dismissMenu() },
-                    )
-                }
+            // Each menu owns its own option/section derivation and track-selection
+            // wiring; PlayerScreen just picks which one to show and how to close it.
+            when (menuKind) {
+                MenuKind.AUDIO -> AudioMenu(
+                    player = player,
+                    currentTracks = currentTracks,
+                    onDismiss = { dismissMenu() },
+                )
+                MenuKind.SUBTITLES -> SubtitlesMenu(
+                    player = player,
+                    currentTracks = currentTracks,
+                    webSubLabels = webSubLabels,
+                    onDismiss = { dismissMenu() },
+                )
+                null -> Unit
             }
           }
         }
     }
 }
 
+// ----------------------------------------------------------------
+// Track-selection helpers. Each mutates the player's
+// trackSelectionParameters to switch or disable a track type; kept off the
+// composables so the menu code reads as intent, not buildUpon() boilerplate.
+// ----------------------------------------------------------------
+
+private fun ExoPlayer.selectTrack(group: TrackGroup, trackIndex: Int) {
+    trackSelectionParameters = trackSelectionParameters.buildUpon()
+        .setOverrideForType(TrackSelectionOverride(group, trackIndex))
+        .build()
+}
+
+private fun ExoPlayer.selectTextTrack(group: TrackGroup, trackIndex: Int) {
+    trackSelectionParameters = trackSelectionParameters.buildUpon()
+        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        .setOverrideForType(TrackSelectionOverride(group, trackIndex))
+        .build()
+}
+
+private fun ExoPlayer.disableTextTracks() {
+    trackSelectionParameters = trackSelectionParameters.buildUpon()
+        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        .build()
+}
+
+// ----------------------------------------------------------------
+// Audio menu — one section of the real audio tracks (or a single "Default"
+// placeholder when the container exposes none). Selecting a row applies an
+// override so playback actually switches.
+// ----------------------------------------------------------------
+
+@Composable
+private fun AudioMenu(
+    player: ExoPlayer,
+    currentTracks: Tracks,
+    onDismiss: () -> Unit,
+) {
+    val options = remember(currentTracks) { audioOptions(currentTracks) }
+    val sections = remember(options) {
+        val rows = if (options.isEmpty()) {
+            listOf(Track("audio-none", "Default", ""))
+        } else {
+            options.map { it.track }
+        }
+        listOf(MenuSection("Audio Tracks", rows))
+    }
+    val selectedIdx = options.indexOfFirst { it.selected }.coerceAtLeast(0)
+
+    MenuOverlay(
+        sections = sections,
+        selectedIndex = selectedIdx,
+        onSelect = { idx ->
+            options.getOrNull(idx)?.let { player.selectTrack(it.group, it.trackIndex) }
+        },
+        onDismiss = onDismiss,
+    )
+}
+
+// ----------------------------------------------------------------
+// Subtitles menu — two sections: ORG (embedded text tracks, preceded by an
+// "Off" row) and WebSubs (sideloaded FebBox tracks, or a "None" placeholder).
+// The flat menu index maps to: 0 = Off, then ORG tracks, then WebSubs tracks.
+// ----------------------------------------------------------------
+
+@Composable
+private fun SubtitlesMenu(
+    player: ExoPlayer,
+    currentTracks: Tracks,
+    webSubLabels: Set<String>,
+    onDismiss: () -> Unit,
+) {
+    val textTracks = remember(currentTracks, webSubLabels) {
+        textOptions(currentTracks, webSubLabels)
+    }
+    val orgOpts = remember(textTracks) { textTracks.filter { !it.isWeb } }
+    val webOpts = remember(textTracks) { textTracks.filter { it.isWeb } }
+    // Selectable tracks in menu order (after the Off row).
+    val ordered = remember(orgOpts, webOpts) { orgOpts + webOpts }
+
+    val sections = remember(orgOpts, webOpts) {
+        val org = buildList {
+            add(Track("sub-off", "Off", ""))
+            addAll(orgOpts.map { it.track })
+        }
+        val web = if (webOpts.isEmpty()) {
+            listOf(Track("web-none", "None", ""))
+        } else {
+            webOpts.map { it.track }
+        }
+        listOf(MenuSection("ORG subs", org), MenuSection("WebSubs", web))
+    }
+
+    // Check follows real selection: an active track -> its row (offset by the
+    // Off row); otherwise Off (index 0).
+    val activeIdx = ordered.indexOfFirst { it.selected }
+    val selectedIdx = if (activeIdx >= 0) activeIdx + 1 else 0
+
+    MenuOverlay(
+        sections = sections,
+        selectedIndex = selectedIdx,
+        onSelect = { idx ->
+            when {
+                idx == 0 -> player.disableTextTracks()
+                idx <= ordered.size -> ordered[idx - 1].let {
+                    player.selectTextTrack(it.group, it.trackIndex)
+                }
+                // "None" placeholder in an empty WebSubs section.
+                else -> Unit
+            }
+        },
+        onDismiss = onDismiss,
+    )
+}
+
 @Composable
 private fun ControlsOverlay(
     title: String,
     visible: Boolean,
-    isPlaying: Boolean,
     position: Long,
     duration: Long,
     seekFocus: FocusRequester,
