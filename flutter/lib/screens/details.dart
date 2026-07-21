@@ -180,7 +180,7 @@ class _DetailsState extends State<Details> {
     pushGuarded(
       context,
       fadeRoute(player, opaque: false),
-    )?.then((_) => _restoreDetailsFocus());
+    ).then((_) => _restoreDetailsFocus());
   }
 
   void _popPlayer() => Navigator.of(context).pop();
