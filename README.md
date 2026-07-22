@@ -1,111 +1,191 @@
-# AlexTV (Web)
+# AlexTV
 
-React + TypeScript + Vite prototype of the AlexTV UI. A D-pad-navigable,
-TV-style streaming front-end that browses TMDB and plays movies through the
-AlexStream backend.
+A TV-style streaming launcher for Android TV and the web — browse TMDB, resolve
+titles to streamable sources via a custom backend, and play them with a
+D-pad-navigable UI.
 
-## Stack
+## What it does
 
-- React 18 + TypeScript
-- Vite 5 (dev server + build)
-- hls.js for HLS playback in the `<video>` element
-- Cloudflare Worker proxy for TMDB + FebBox fetches (CORS bypass)
+- **Content discovery** — five TMDB rails (Trending, Popular, Top Rated, TV
+  Series, Coming Soon) plus a cinematic auto-rotating hero
+- **Debounced search** — TMDB multi-search with poster grid
+- **Streaming resolution** — resolves any TMDB title through ShowBox → FebBox,
+  fetches video files with quality picker, and plays via HLS
+- **TV series support** — season folder navigation, episode deduplication,
+  season tab bar
+- **Personal media library** — browse and play files from a cloud media volume
+  with breadcrumb navigation and watch-progress tracking with resume
+- **Self-update** — Flutter app downloads the latest APK from GitHub Releases
+  and hands off to the system installer
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│  React Web App (/)          Flutter Android TV App  │
+│  Vite + TypeScript          Dart + ExoPlayer        │
+│  D-pad spatial focus        D-pad spatial focus     │
+├─────────────────────────────────────────────────────┤
+│  Cloudflare Worker  ──  TMDB proxy + FebBox CORS   │
+│  AlexStream backend ──  ShowBox / FebBox resolver   │
+│  AlexTV Library     ──  Media volume browser/player │
+└─────────────────────────────────────────────────────┘
+```
+
+Three frontends share the same UI, focus engine, and data layer:
+- **React web app** (`/`) — browser prototype, ports to TV via Vite `host:true`
+- **Flutter Android TV app** (`flutter/`) — native Android TV with ExoPlayer
+- **Player UI prototype** (`player-ui/`) — standalone player controls sandbox
+
+Two backend services:
+- **AlexStream** (Node.js, deployed on Modal) — ShowBox integration:
+  resolve → share-key → files → stream links
+- **AlexTV Library** (`modalbackend/`) — FastAPI on Modal: browse and stream a
+  personal media volume, plus an xterm.js terminal for management
+
+One proxy:
+- **Cloudflare Worker** (`worker.js`) — TMDB API proxy with CORS, FebBox
+  stream URL rewriting with Range support for seeking
 
 ## Project layout
 
 ```
-src/
-  App.tsx              # Root: routes between Home and Details
-  main.tsx             # Vite entry
-  styles.css           # All styling (no CSS-in-JS, no Tailwind)
+src/                          # React web app
+  App.tsx                     # Root: sidebar + screen routing
+  styles.css                  # All styling (~26 KB, no CSS framework)
   api/
-    tmdb.ts            # TMDB data layer (rails, hero, normalize)
-    stream.ts          # Stream API client (resolve → files → links)
+    tmdb.ts                   # TMDB data layer (rails, search, normalize)
+    stream.ts                 # Stream resolution chain (resolve → files → links)
+    library.ts                # Library backend client
+    series.ts                 # Series helpers: season parsing, episode dedup
   components/
-    Hero.tsx           # Auto-rotating cinematic hero
-    PosterCard.tsx     # Poster card with focus lift
-    Rail.tsx           # Horizontal scrolling rail of cards
-    Player.tsx         # Three-step playback modal + video player
-    HeaderButton.tsx   # Pill-shaped nav button
-    FadeImage.tsx      # Image with fade-in on load
+    Hero.tsx                  # Auto-rotating cinematic hero (10 s interval)
+    PosterCard.tsx            # Poster card with focus lift animation
+    Rail.tsx                  # Horizontal scrolling rail of poster cards
+    Player.tsx                # Three-step modal: file picker → quality → video
+    Sidebar.tsx               # Netflix-style collapsible left sidebar
+    HeaderButton.tsx          # Pill-shaped nav/sort button
+    FadeImage.tsx             # Image with fade-in on load
+    Spinner.tsx               # Apple-style loading spinner
+    icons.tsx                 # Inline SVG sidebar icons
   screens/
-    Home.tsx           # Hero + rails layout
-    Details.tsx        # Fullscreen details with Play / Watch Later
+    Home.tsx                  # Hero + content rails
+    Details.tsx               # Fullscreen details + Play + season picker
+    Search.tsx                # Debounced TMDB multi-search (350 ms)
+    Library.tsx               # File-manager library browser with breadcrumbs
   focus/
-    FocusEngine.tsx    # Spatial D-pad focus engine (arrow keys + Enter)
+    FocusEngine.tsx           # Spatial D-pad focus engine
+
+flutter/                      # Flutter Android TV app
+  lib/
+    main.dart                 # App entry, design scaler, route helpers
+    routes.dart               # Shared page transitions + push-guard
+    theme.dart                # Design tokens (colors, sizes)
+    api/                      # Mirrors React api/: tmdb, stream, library, series
+    components/               # Mirrors React components: hero, cards, player, sidebar
+    screens/                  # Mirrors React screens: home, details, search, library
+    focus/                    # Focus engine Dart port + FocusableState mixin
+    update/                   # Self-updater (download APK → system installer)
+  android/app/src/main/kotlin/com/example/alextv/
+    MainActivity.kt           # Registers platform views
+    PlayerActivity.kt         # Native ExoPlayer activity
+    PlaybackProgressStore.kt  # Watch-progress persistence
+    surfaceplayer/            # SurfaceView + ExoPlayer platform view
+  plugins/video_player_android/  # Vendored plugin with ExoPlayer decoder fallback
+
+player-ui/                    # Standalone player controls prototype (port 5174)
+
+modalbackend/                 # Library backend (FastAPI on Modal)
+  app.py                      # API: browse, stream, PTY shell
+  terminal.py                 # PTY-over-WebSocket for xterm.js
+  terminal.html               # xterm.js frontend
+
+worker.js                     # Cloudflare Worker: TMDB + FebBox proxy
+
+docs/
+  hybrid-player-architecture.md  # Native decode + Flutter chrome notes
+
+.github/workflows/
+  android-build.yml           # CI: builds Flutter APK → rolling GitHub Release
 ```
 
 ## Focus engine
 
-`FocusEngine.tsx` implements a spatial D-pad focus system, not DOM tab order.
-Every focusable registers its DOM rect. On an arrow key the engine picks the
-nearest neighbour in the pressed direction using a distance + alignment cost
-(weighted so straight-line neighbours win). This is what makes the UI feel
-like a real TV launcher and is the basis for the Flutter port.
+Both React and Flutter use a **spatial D-pad focus system** (not DOM tab order
+or Flutter's built-in focus). Each focusable registers its bounding rect, and
+arrow keys pick the nearest neighbour using distance + alignment cost weighting.
+This is what makes the UI feel like a real TV launcher.
 
-- Arrow keys move focus spatially.
-- Enter / Space / Select triggers `onSelect`.
-- Escape / Backspace triggers `onBack` (exits Details back to Home).
-- The seekbar intercepts left/right when focused so it seeks instead of
-  moving focus away.
+- Arrow keys move focus spatially
+- Enter / Select triggers `onSelect`
+- Back / Escape triggers `onBack` to the previous screen
+- Holding an arrow key on the seekbar ramps seek speed
+- Controls auto-hide after 4 s of inactivity
 
-## Player flow
+## Stream resolution chain
 
-The `Player` component runs a three-step chain (movie-only for now):
-
-1. **Resolve** — `resolveMovie(title, year)` calls the backend
-   `/api/resolve` → `/api/share-key` → `/api/files` chain.
-2. **File picker** — lists the returned `VideoFile[]` (file name, resolution,
-   size). User picks one.
-3. **Quality picker** — fetches `StreamLink[]` via `/api/links?fid=`. User
-   picks a quality.
-4. **Play** — the `proxiedUrl` is handed to `<video>`. HLS streams use
-   `hls.js` (Chrome/Firefox); Safari uses native HLS; mp4 plays directly.
-
-Escape steps back (links → files) or closes the player.
-
-## TMDB rails
-
-`fetchHomeRails()` pulls five rails in parallel:
-
-- Trending This Week
-- Popular Movies
-- Top Rated
-- Popular Series
-- Coming Soon
-
-The hero auto-rotates through the first 10 trending titles that have a
-backdrop, every 10 seconds.
-
-## Backend
-
-The web app talks to the AlexStream backend (see `BACKEND_DOC.md`) at
-`https://alexhasitbig--alexstream-serve.modal.run`. Endpoints used:
-
-- `/api/resolve` — title + year → ShowBox ID
-- `/api/share-key` — ShowBox ID → FebBox share key
-- `/api/files` — share key → video file list
-- `/api/links` — file ID → stream links (with proxied URLs)
-
-TMDB is called browser-side through the Cloudflare Worker proxy
-(`worker.js` in this repo, deployed at
-`lunaissohot.lunastar0003.workers.dev`). The API key is currently inline in
-`src/api/tmdb.ts` — fine for a local prototype, should move server-side for
-production.
+1. **Resolve** — TMDB title + year → ShowBox ID (`/api/resolve`)
+2. **Share key** — ShowBox ID → FebBox share key (`/api/share-key`)
+3. **Files** — share key → video file list with name, resolution, size
+   (`/api/files`; for series: `/api/files?tv_key=...`)
+4. **Links** — file ID → stream links with proxy URLs (`/api/links`)
+5. **Play** — HLS goes through `hls.js` (web) or native ExoPlayer (Flutter);
+   mp4 plays directly
 
 ## Develop
+
+### Web app
 
 ```bash
 npm install
 npm run dev      # Vite dev server (host: true so TV can reach it)
 npm run build    # tsc + vite build → dist/
-npm run preview  # serve the built dist/
+npm run preview  # Serve the built dist/
 ```
 
-## Notes
+### Flutter Android TV app
 
-- The web prototype and the Flutter Android TV app share the same UI, the
-  same focus engine, and the same data layer. See `flutter/README.md`.
-- The Cloudflare Worker (`worker.js`) is a separate deployment. It streams
-  responses with Range support so seeking works, and only allows known
-  FebBox / shegu hosts.
+```bash
+cd flutter
+flutter pub get
+flutter analyze
+flutter run                    # Debug on connected TV / emulator
+flutter build apk --release    # Release APK
+```
+
+### Player UI sandbox
+
+```bash
+cd player-ui
+npm install
+npm run dev      # Runs on port 5174
+```
+
+### Library backend
+
+```bash
+cd modalbackend
+pip install modal
+modal deploy app.py
+```
+
+Requires a Modal volume (`vibe-media`) mounted at `/vol` with media under
+`/vol/media`.
+
+## Backend endpoints
+
+| Service | URL |
+|---|---|
+| AlexStream | `https://alexhasitbig--alexstream-serve.modal.run` |
+| AlexTV Library | `https://alexhasitbig--alextv-library-start.modal.run` |
+| Cloudflare Worker | `https://lunaissohot.lunastar0003.workers.dev` |
+
+The TMDB API key is inline in `src/api/tmdb.ts` (fine for a local prototype;
+should move server-side for production).
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/android-build.yml`) triggers on pushes to
+`main` and PRs — builds the Flutter release APK and publishes it to a rolling
+GitHub Release (tag `latest`). The Flutter app's self-updater fetches from this
+release.
