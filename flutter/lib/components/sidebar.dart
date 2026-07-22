@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../focus/focus_engine.dart';
 import '../theme.dart';
+import 'nav_icons.dart';
 
 /// Netflix/Hotstar-style left sidebar. Ported 1:1 from `src/components/Sidebar.tsx`.
 /// Collapsed by default (icon only), it expands to reveal the label when any of
@@ -16,7 +17,7 @@ enum NavId { home, search, library, movies, tv, settings, update }
 class NavItem {
   final NavId id;
   final String label;
-  final IconData icon;
+  final String icon;
   final VoidCallback? onSelect;
   const NavItem(
     this.id,
@@ -30,13 +31,13 @@ class NavItem {
 /// wire the handlers they can service via [withHandlers]; the rest stay
 /// placeholders until their screens exist.
 const List<NavItem> kNavItems = [
-  NavItem(NavId.home, 'Home', Icons.home_rounded),
-  NavItem(NavId.search, 'Search', Icons.search_rounded),
-  NavItem(NavId.library, 'Library', Icons.video_library_rounded),
-  NavItem(NavId.movies, 'Movies', Icons.movie_rounded),
-  NavItem(NavId.tv, 'TV Shows', Icons.tv_rounded),
-  NavItem(NavId.settings, 'Settings', Icons.settings_rounded),
-  NavItem(NavId.update, 'Update', Icons.download_rounded),
+  NavItem(NavId.home, 'Home', NavIcons.home),
+  NavItem(NavId.search, 'Search', NavIcons.search),
+  NavItem(NavId.library, 'Library', NavIcons.library),
+  NavItem(NavId.movies, 'Movies', NavIcons.film),
+  NavItem(NavId.tv, 'TV Shows', NavIcons.tv),
+  NavItem(NavId.settings, 'Settings', NavIcons.settings),
+  NavItem(NavId.update, 'Update', NavIcons.update),
 ];
 
 /// Attach onSelect handlers to nav items by id; unmatched items stay as-is.
@@ -126,48 +127,55 @@ class _SidebarState extends State<Sidebar> {
       // OverflowBox below) stay hidden when the rail is collapsed, instead of
       // being measured down to 76px and wrapping/truncating. Mirrors the CSS
       // `overflow: hidden` on `.sidebar`.
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        width: _expanded
-            ? AppSizes.sidebarExpandedWidth
-            : AppSizes.sidebarCollapsedWidth,
+      child: DecoratedBox(
         // Match the React gradient: a horizontal fade from near-opaque at the
         // left edge to transparent at the right, so the expanded rail dims the
-        // content behind it without a hard vertical cut.
+        // content behind it without a hard vertical cut. It lives on a plain
+        // DecoratedBox (not the AnimatedContainer) so it appears/disappears
+        // instantly with the expanded state — mirroring React, where
+        // `.sidebar--expanded` toggles the background while only `width`
+        // transitions. An AnimatedContainer would lerp the decoration, which
+        // cross-fades the backdrop in and reads differently from the web.
         decoration: BoxDecoration(
           gradient: _expanded ? _expandedGradient : null,
         ),
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: OverflowBox(
-          // Let the items column always be `sidebarItemWidth` wide regardless
-          // of the (animated) rail width, so labels keep their natural size.
-          // The ClipRect above paints only the visible slice.
-          maxWidth: AppSizes.sidebarItemWidth,
-          minWidth: AppSizes.sidebarItemWidth,
-          maxHeight: double.infinity,
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            // `.sidebar__items { padding: 0 12px }` — gives the icon column some
-            // breathing room from the rail's left edge so it sits roughly
-            // centered in the collapsed 76px rail (icon center ≈ 39px).
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              // `align-items: stretch` — each item fills the 200px content width
-              // so the icon+label row left-aligns within it, matching React.
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < widget.items.length; i++) ...[
-                  _SidebarItemView(
-                    item: widget.items[i],
-                    id: _ids[i],
-                    expanded: _expanded,
-                  ),
-                  if (i < widget.items.length - 1)
-                    const SizedBox(height: 12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          width: _expanded
+              ? AppSizes.sidebarExpandedWidth
+              : AppSizes.sidebarCollapsedWidth,
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: OverflowBox(
+            // Let the items column always be `sidebarItemWidth` wide regardless
+            // of the (animated) rail width, so labels keep their natural size.
+            // The ClipRect above paints only the visible slice.
+            maxWidth: AppSizes.sidebarItemWidth,
+            minWidth: AppSizes.sidebarItemWidth,
+            maxHeight: double.infinity,
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              // `.sidebar__items { padding: 0 12px }` — gives the icon column some
+              // breathing room from the rail's left edge so it sits roughly
+              // centered in the collapsed 76px rail (icon center ≈ 39px).
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                // `align-items: stretch` — each item fills the 200px content width
+                // so the icon+label row left-aligns within it, matching React.
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < widget.items.length; i++) ...[
+                    _SidebarItemView(
+                      item: widget.items[i],
+                      id: _ids[i],
+                      expanded: _expanded,
+                    ),
+                    if (i < widget.items.length - 1)
+                      const SizedBox(height: 12),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -221,7 +229,7 @@ class _SidebarItemView extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = FocusScopeProvider.of(context);
     final focused = controller.isFocused(id);
-    final color = focused ? AppColors.text : AppColors.muted;
+    final targetColor = focused ? AppColors.text : AppColors.muted;
 
     return KeyedSubtree(
       key: controller.keyOf(id),
@@ -229,21 +237,33 @@ class _SidebarItemView extends StatelessWidget {
         onTap: item.onSelect,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(item.icon, size: 26, color: color),
-              const SizedBox(width: 16),
-              // Label fades in only when the rail is expanded. An animated
-              // underline (scaleX 0 → 1) marks the focused item, matching the
-              // navbar buttons' ::after underline.
-              _Label(
-                label: item.label,
-                color: color,
-                expanded: expanded,
-                focused: focused,
-              ),
-            ],
+          // Animate the muted↔text colour over 160ms, mirroring the CSS
+          // `.sidebar__item { transition: color 0.16s ease }` so the icon and
+          // label fade colour on focus instead of snapping. The interpolated
+          // colour drives both the SVG icon and the label (text + underline).
+          child: TweenAnimationBuilder<Color?>(
+            tween: ColorTween(end: targetColor),
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            builder: (context, animColor, _) {
+              final color = animColor ?? targetColor;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NavIcon(svg: item.icon, color: color, size: 26),
+                  const SizedBox(width: 16),
+                  // Label fades in only when the rail is expanded. An animated
+                  // underline (scaleX 0 → 1) marks the focused item, matching the
+                  // navbar buttons' ::after underline.
+                  _Label(
+                    label: item.label,
+                    color: color,
+                    expanded: expanded,
+                    focused: focused,
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -270,28 +290,32 @@ class _Label extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Padding(
-            // Room for the 2px underline below the label.
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
           ),
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            // Sit the underline just below the text without adding height to
+            // the label, so the Row keeps the text vertically centered against
+            // the icon. Mirrors the CSS `.sidebar__label::after { bottom: -4px }`.
+            bottom: -4,
             child: AnimatedScale(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
+              // Grow the underline from its left edge, mirroring the CSS
+              // `.sidebar__label::after { transform-origin: left }`. The default
+              // (center) alignment would make it expand outward from the middle.
+              alignment: Alignment.centerLeft,
               scale: focused ? 1 : 0,
               child: Container(height: 2, color: color),
             ),

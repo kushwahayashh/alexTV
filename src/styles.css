@@ -360,9 +360,12 @@ body {
   scrollbar-width: none;
   /* Soft-fade the left edge so posters dissolve as they scroll under the
      collapsed sidebar instead of getting sliced at a hard vertical cut. The
-     fade spans the sidebar zone; the right edge stays fully visible. */
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 96px);
-  mask-image: linear-gradient(to right, transparent 0, #000 96px);
+     fade is fully opaque by the collapsed sidebar's right edge (screen x=76)
+     so a resting/focused first poster is never washed: the track box starts at
+     screen x=44 (92px content − 48px negative margin), so the opaque point
+     lands at 76 − 44 = 32px. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 32px);
+  mask-image: linear-gradient(to right, transparent 0, #000 32px);
 }
 .rail__track::-webkit-scrollbar {
   display: none;

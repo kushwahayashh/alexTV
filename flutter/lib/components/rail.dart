@@ -53,17 +53,22 @@ class _RailState extends State<Rail> {
         // vertical padding is cancelled by a negative margin). Clip.none lets
         // the focused poster's scale-up overflow without being clipped.
         //
-        // ShaderMask replicates the CSS `mask-image: linear-gradient(to right,
-        // transparent 0, #000 96px)` on `.rail__track`: the left 96px fade from
-        // transparent to opaque so posters dissolve as they scroll under the
-        // collapsed sidebar instead of getting sliced at a hard vertical cut.
-        // BlendMode.dstIn uses the shader's alpha as the child's alpha —
-        // transparent areas of the gradient make the child invisible.
+        // ShaderMask fades posters out as they scroll under the collapsed
+        // sidebar instead of getting sliced at a hard vertical cut. The fade
+        // must be fully opaque by the collapsed sidebar's right edge so a
+        // resting/focused first poster is never washed: the rail track starts
+        // at screen x=44 (sidebarContentPad 92 − pagePadding 48) and the
+        // collapsed sidebar ends at screen x=76, so in rail-local coordinates
+        // the opaque point lands at 76 − 44 = 32px. BlendMode.dstIn uses the
+        // shader's alpha as the child's alpha — transparent areas hide it.
         SizedBox(
           height: AppSizes.posterH,
           child: ShaderMask(
             shaderCallback: (bounds) {
-              final fade = AppSizes.sidebarFadeWidth / bounds.width;
+              const fadeEnd =
+                  AppSizes.sidebarCollapsedWidth -
+                  (AppSizes.sidebarContentPad - AppSizes.pagePadding);
+              final fade = fadeEnd / bounds.width;
               return LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
@@ -72,30 +77,56 @@ class _RailState extends State<Rail> {
               ).createShader(bounds);
             },
             blendMode: BlendMode.dstIn,
-            child: ListView.separated(
-              controller: _railController,
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.pagePadding,
+            // Clip the ListView's horizontal overflow to the rail viewport
+            // (mirrors CSS `overflow-x: auto` on `.rail__track`) while leaving
+            // the vertical axis open (`overflow-y: visible`) so a focused
+            // poster's scale-up and drop shadow are never sliced. Without this,
+            // Clip.none leaves the horizontal overflow unclipped, so the region
+            // the ShaderMask composites changes frame-to-frame as posters
+            // scroll — which makes the left-edge fade flicker.
+            child: ClipRect(
+              clipper: const _RailHClip(),
+              child: ListView.separated(
+                controller: _railController,
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.pagePadding,
+                ),
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: widget.rail.items.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: AppSizes.posterGap),
+                itemBuilder: (context, i) {
+                  final media = widget.rail.items[i];
+                  return PosterCard(
+                    media: media,
+                    pageController: widget.pageController,
+                    railController: _railController,
+                    onSelect: widget.onSelect,
+                  );
+                },
               ),
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: widget.rail.items.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(width: AppSizes.posterGap),
-              itemBuilder: (context, i) {
-                final media = widget.rail.items[i];
-                return PosterCard(
-                  media: media,
-                  pageController: widget.pageController,
-                  railController: _railController,
-                  onSelect: widget.onSelect,
-                );
-              },
             ),
           ),
         ),
       ],
     );
   }
+}
+
+/// Clips only the horizontal axis to the rail viewport, leaving the vertical
+/// axis effectively unclipped. Mirrors `.rail__track { overflow-x: auto;
+/// overflow-y: visible }`: posters that scroll off the sides are clipped so the
+/// ShaderMask fade stays stable, but a focused poster's scale-up and drop
+/// shadow can still overflow above/below without being sliced.
+class _RailHClip extends CustomClipper<Rect> {
+  const _RailHClip();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, -size.height, size.width, size.height * 2);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
 }
