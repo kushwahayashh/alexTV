@@ -183,7 +183,7 @@ private fun PlayerView.applyVarelaRoundSubtitleStyle() {
         setStyle(
             CaptionStyleCompat(
                 android.graphics.Color.WHITE,
-                android.graphics.Color.TRANSPARENT,
+                0xCC000000.toInt(),
                 android.graphics.Color.TRANSPARENT,
                 CaptionStyleCompat.EDGE_TYPE_OUTLINE,
                 android.graphics.Color.BLACK,
@@ -942,7 +942,16 @@ private fun ControlsOverlay(
                 .alpha(barsAlpha)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color(0xB3000000), Color.Transparent)
+                        colorStops = arrayOf(
+                            0.0f to Color(0xD9000000),
+                            0.12f to Color(0xBD000000),
+                            0.24f to Color(0x99000000),
+                            0.38f to Color(0x70000000),
+                            0.54f to Color(0x47000000),
+                            0.72f to Color(0x26000000),
+                            0.88f to Color(0x0F000000),
+                            1.0f to Color.Transparent,
+                        )
                     )
                 )
                 .padding(horizontal = 40.dp, vertical = 24.dp),
@@ -975,7 +984,16 @@ private fun ControlsOverlay(
                 .alpha(barsAlpha)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0xBF000000))
+                        colorStops = arrayOf(
+                            0.0f to Color.Transparent,
+                            0.12f to Color(0x0F000000),
+                            0.28f to Color(0x29000000),
+                            0.46f to Color(0x4D000000),
+                            0.62f to Color(0x78000000),
+                            0.76f to Color(0xA3000000),
+                            0.88f to Color(0xC9000000),
+                            1.0f to Color(0xE6000000),
+                        )
                     )
                 )
                 .padding(horizontal = 40.dp, vertical = 28.dp),

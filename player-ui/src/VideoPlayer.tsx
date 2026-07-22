@@ -422,7 +422,7 @@ export function VideoPlayer({
     <div className="player-stage">
       <img
         className="player-mock-video"
-        src="https://image.tmdb.org/t/p/original/r013C8Me2bZ0pUi0OWJRh0h7MzT.jpg"
+        src="https://image.tmdb.org/t/p/original/O2ioY0wpltYjcevoP90MCEhGVO.jpg"
         alt=""
       />
 
