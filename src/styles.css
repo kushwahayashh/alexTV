@@ -124,8 +124,7 @@ body {
 /* Navbar buttons: no pill container, just an animated underline. Scoped to the
    nav rows so Details/Player pills keep their filled style. */
 .home__header .header-btn,
-.library__nav .header-btn,
-.search__nav .header-btn {
+.library__nav .header-btn {
   padding: 10px 4px;
   border-radius: 0;
   background: none;
@@ -133,8 +132,7 @@ body {
   transition: color 0.16s ease;
 }
 .home__header .header-btn::after,
-.library__nav .header-btn::after,
-.search__nav .header-btn::after {
+.library__nav .header-btn::after {
   content: '';
   position: absolute;
   left: 4px;
@@ -149,18 +147,14 @@ body {
 .home__header .header-btn:hover,
 .home__header .header-btn--focused,
 .library__nav .header-btn:hover,
-.library__nav .header-btn--focused,
-.search__nav .header-btn:hover,
-.search__nav .header-btn--focused {
+.library__nav .header-btn--focused {
   background: none;
   color: var(--text);
 }
 .home__header .header-btn:hover::after,
 .home__header .header-btn--focused::after,
 .library__nav .header-btn:hover::after,
-.library__nav .header-btn--focused::after,
-.search__nav .header-btn:hover::after,
-.search__nav .header-btn--focused::after {
+.library__nav .header-btn--focused::after {
   transform: scaleX(1);
 }
 
@@ -673,24 +667,14 @@ body {
 .search::-webkit-scrollbar {
   display: none;
 }
-.search__topbar {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 40px;
-}
-.search__nav {
-  display: flex;
-  gap: 12px;
-  flex: 0 0 auto;
-}
 .search__bar-wrap {
   position: relative;
   display: flex;
   align-items: center;
-  /* Fill the rest of the nav row, capped so it stays compact. */
-  flex: 1 1 auto;
-  max-width: 480px;
+  /* Sole top element now — center it horizontally with room below. */
+  width: 100%;
+  max-width: 520px;
+  margin: 8px auto 48px;
 }
 .search__icon {
   position: absolute;
@@ -702,16 +686,20 @@ body {
 }
 .search__input {
   width: 100%;
-  padding: 13px 22px 13px 50px;
+  padding: 15px 22px 15px 52px;
+  /* Minimal, square: sharp edges, no border. */
   border: none;
-  border-radius: 999px;
-  /* Match the navbar pill buttons; no focused-color swap. */
-  background: rgba(255, 255, 255, 0.22);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text);
   font-family: inherit;
   font-size: 1.05rem;
   font-weight: 600;
   outline: none;
+  transition: background 0.16s ease;
+}
+.search__input:focus {
+  background: rgba(255, 255, 255, 0.1);
 }
 .search__input::placeholder {
   color: var(--muted);

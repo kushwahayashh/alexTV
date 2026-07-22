@@ -125,7 +125,7 @@ export default function App() {
           result returns to the same query and grid position. */}
       {showSearch && (
         <div style={{ display: selected ? 'none' : 'contents' }}>
-          <Search onSelect={handleSelect} onGoHome={handleCloseSearch} />
+          <Search onSelect={handleSelect} />
         </div>
       )}
       {showLibrary && (

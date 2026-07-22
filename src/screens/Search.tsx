@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { searchMulti, type Media } from '../api/tmdb'
 import { useFocusable } from '../focus/FocusEngine'
 import { PosterCard } from '../components/PosterCard'
-import { HeaderButton } from '../components/HeaderButton'
 
 const DEBOUNCE_MS = 350
 
@@ -11,17 +10,12 @@ type Status = 'idle' | 'loading' | 'ready'
 /**
  * TMDB-first search screen. Typing debounces 350ms then hits /search/multi;
  * results render as a poster grid that hands each pick to the shared Details →
- * Player flow via onSelect. The focus engine drives D-pad nav (Up → header,
- * Down/Enter → grid); this component only mirrors focus onto the real <input>
- * so keystrokes actually land in the field.
+ * Player flow via onSelect. A single minimal search box sits top-center; the
+ * focus engine drives D-pad nav (Down/Enter → grid) while this component
+ * mirrors focus onto the real <input> so keystrokes land in the field. Back
+ * (Esc) returns to Home, handled globally by the focus provider.
  */
-export function Search({
-  onSelect,
-  onGoHome,
-}: {
-  onSelect: (m: Media) => void
-  onGoHome: () => void
-}) {
+export function Search({ onSelect }: { onSelect: (m: Media) => void }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Media[]>([])
   const [status, setStatus] = useState<Status>('idle')
@@ -75,37 +69,29 @@ export function Search({
 
   return (
     <div className="search">
-      <div className="search__topbar">
-        <div className="search__nav">
-          <HeaderButton label="Home" onSelect={onGoHome} />
-          <HeaderButton label="Search" />
-          <HeaderButton label="Library" />
-        </div>
-
-        <div className="search__bar-wrap">
-          <svg
-            className="search__icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.2}
-            strokeLinecap="round"
-            aria-hidden
-          >
-            <circle cx="11" cy="11" r="7" />
-            <line x1="16.5" y1="16.5" x2="21" y2="21" />
-          </svg>
-          <input
-            ref={field.ref as React.RefObject<HTMLInputElement>}
-            className="search__input"
-            type="text"
-            placeholder="Search movies & series…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-          />
-        </div>
+      <div className="search__bar-wrap">
+        <svg
+          className="search__icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          aria-hidden
+        >
+          <circle cx="11" cy="11" r="7" />
+          <line x1="16.5" y1="16.5" x2="21" y2="21" />
+        </svg>
+        <input
+          ref={field.ref as React.RefObject<HTMLInputElement>}
+          className="search__input"
+          type="text"
+          placeholder="Search movies & series…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          spellCheck={false}
+          autoComplete="off"
+        />
       </div>
 
       {status === 'loading' && (

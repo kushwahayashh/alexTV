@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart' as api;
 import '../components/fade_image.dart';
-import '../components/header_button.dart';
 import '../focus/focus_engine.dart';
 import '../focus/focusable.dart';
 import '../main.dart' show openDetails;
@@ -124,39 +123,17 @@ class _SearchState extends State<Search> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    // Pin to the top so the pill buttons stay at y=24 like
-                    // Home's navbar. The search field is taller than the pills,
-                    // so centering (the Row default) would nudge the buttons
-                    // down a few px and read as a jitter during the cross-fade
-                    // transition from Home.
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          HeaderButton(
-                            label: 'Home',
-                            onSelect: () => Navigator.of(context).maybePop(),
-                          ),
-                          const SizedBox(width: 12),
-                          const HeaderButton(label: 'Search'),
-                          const SizedBox(width: 12),
-                          const HeaderButton(label: 'Library'),
-                        ],
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: _SearchField(
+                        fieldId: _fieldId,
+                        controller: _queryController,
+                        focusNode: _fieldNode,
                       ),
-                      const SizedBox(width: 24),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: _SearchField(
-                          fieldId: _fieldId,
-                          controller: _queryController,
-                          focusNode: _fieldNode,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
                   _SearchBody(
                     status: _status,
                     results: _results,
@@ -210,14 +187,22 @@ class _SearchField extends StatelessWidget {
             size: 20,
           ),
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.22),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
+          fillColor: Colors.white.withValues(alpha: 0.06),
+          border: const OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
             borderSide: BorderSide.none,
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 22,
-            vertical: 13,
+            vertical: 15,
           ),
         ),
       ),
