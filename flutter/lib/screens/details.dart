@@ -5,6 +5,7 @@ import '../api/stream.dart' as stream;
 import '../api/tmdb.dart';
 import '../components/hero.dart' show FadeIn;
 import '../components/fade_image.dart';
+import '../components/nav_icons.dart';
 import '../components/player.dart';
 import '../focus/focus_engine.dart';
 import '../focus/focusable.dart';
@@ -445,14 +446,14 @@ class _DetailsContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _DetailsButton(
-              icon: Icons.play_arrow,
+              svg: NavIcons.playFilled,
               label: 'Play',
               id: playId,
               focused: controller.isFocused(playId),
             ),
             const SizedBox(width: 14),
             _DetailsButton(
-              icon: Icons.add,
+              svg: NavIcons.plusFilled,
               label: 'Watch Later',
               id: watchLaterId,
               focused: controller.isFocused(watchLaterId),
@@ -949,13 +950,13 @@ class _EpisodeRowState extends State<_EpisodeRow> with FocusableState {
 }
 
 class _DetailsButton extends StatelessWidget {
-  final IconData icon;
+  final String svg;
   final String label;
   final int id;
   final bool focused;
 
   const _DetailsButton({
-    required this.icon,
+    required this.svg,
     required this.label,
     required this.id,
     required this.focused,
@@ -979,12 +980,12 @@ class _DetailsButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 18,
+            NavIcon(
+              svg: svg,
+              size: 20,
               color: focused ? AppColors.bg : AppColors.text,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(

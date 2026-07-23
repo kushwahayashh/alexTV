@@ -476,6 +476,16 @@ body {
   gap: 14px;
   margin-top: 28px;
 }
+.details__actions .header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.details__action-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
 
 /* ---------- Series: season bar + episode list ---------- */
 /* For series the hero is shorter so the season bar + first episodes are

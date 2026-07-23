@@ -51,6 +51,18 @@ const String _update = '''
   <path d="M5 21h14" />
 </svg>''';
 
+// Filled tabler glyphs (fill="currentColor", no stroke) for the Details action
+// buttons, ported 1:1 from the PlayIcon/PlusIcon in src/components/icons.tsx.
+const String _playFilled = '''
+<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M6 4v16a1 1 0 0 0 1.524 .852l13 -8a1 1 0 0 0 0 -1.704l-13 -8a1 1 0 0 0 -1.524 .852z" />
+</svg>''';
+
+const String _plusFilled = '''
+<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 0 1 0 2h-6v6a1 1 0 0 1 -2 0v-6h-6a1 1 0 0 1 0 -2h6v-6a1 1 0 0 1 1 -1" />
+</svg>''';
+
 /// Raw SVG markup for each sidebar glyph.
 class NavIcons {
   static const String home = _home;
@@ -60,6 +72,8 @@ class NavIcons {
   static const String tv = _tv;
   static const String settings = _settings;
   static const String update = _update;
+  static const String playFilled = _playFilled;
+  static const String plusFilled = _plusFilled;
 }
 
 /// Renders a sidebar nav glyph from its raw SVG markup, tinting the strokes to

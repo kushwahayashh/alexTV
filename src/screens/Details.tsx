@@ -13,6 +13,7 @@ import {
   type SeasonOption,
 } from '../api/series'
 import { FadeImage } from '../components/FadeImage'
+import { PlayIcon, PlusIcon } from '../components/icons'
 import { Player } from '../components/Player'
 
 /**
@@ -166,14 +167,16 @@ export function Details({ media }: { media: Media }) {
               className={`header-btn${play.focused ? ' header-btn--focused' : ''}`}
               type="button"
             >
-              ▶ Play
+              <PlayIcon className="details__action-icon" />
+              Play
             </button>
             <button
               ref={watchLater.ref}
               className={`header-btn${watchLater.focused ? ' header-btn--focused' : ''}`}
               type="button"
             >
-              + Watch Later
+              <PlusIcon className="details__action-icon" />
+              Watch Later
             </button>
           </div>
         </div>
