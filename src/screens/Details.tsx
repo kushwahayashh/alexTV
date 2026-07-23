@@ -49,7 +49,7 @@ export function Details({ media }: { media: Media }) {
   // The fid the hero Play button targets (first episode of the first season).
   const [playFid, setPlayFid] = useState<number | null>(null)
 
-  const play = useFocusable({
+  const play = useFocusable<HTMLButtonElement>({
     onSelect: () => {
       if (!isTv) setShowPlayer(true)
       else if (playFid != null && episodes?.length)
@@ -58,7 +58,7 @@ export function Details({ media }: { media: Media }) {
     scrollMode: 'top',
     active: !playerOpen,
   })
-  const watchLater = useFocusable({
+  const watchLater = useFocusable<HTMLButtonElement>({
     onSelect: () => console.log('WATCH LATER', media.title),
     scrollMode: 'top',
     active: !playerOpen,
@@ -162,14 +162,14 @@ export function Details({ media }: { media: Media }) {
           <p className="details__overview">{media.overview}</p>
           <div className="details__actions">
             <button
-              ref={play.ref as React.RefObject<HTMLButtonElement>}
+              ref={play.ref}
               className={`header-btn${play.focused ? ' header-btn--focused' : ''}`}
               type="button"
             >
               ▶ Play
             </button>
             <button
-              ref={watchLater.ref as React.RefObject<HTMLButtonElement>}
+              ref={watchLater.ref}
               className={`header-btn${watchLater.focused ? ' header-btn--focused' : ''}`}
               type="button"
             >
@@ -254,10 +254,10 @@ function SeasonTab({
   enabled: boolean
   onSelect: () => void
 }) {
-  const { ref, focused } = useFocusable({ onSelect, active: enabled })
+  const { ref, focused } = useFocusable<HTMLButtonElement>({ onSelect, active: enabled })
   return (
     <button
-      ref={ref as React.RefObject<HTMLButtonElement>}
+      ref={ref}
       className={`season-tab${active ? ' season-tab--active' : ''}${
         focused ? ' season-tab--focused' : ''
       }`}
@@ -283,10 +283,10 @@ function EpisodeRow({
   enabled: boolean
   onSelect: () => void
 }) {
-  const { ref, focused } = useFocusable({ onSelect, active: enabled })
+  const { ref, focused } = useFocusable<HTMLButtonElement>({ onSelect, active: enabled })
   return (
     <button
-      ref={ref as React.RefObject<HTMLButtonElement>}
+      ref={ref}
       className={`ep-row${focused ? ' ep-row--focused' : ''}`}
       type="button"
     >

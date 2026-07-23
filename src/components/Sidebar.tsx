@@ -56,7 +56,7 @@ function SidebarItemView({
   item: SidebarItem
   onFocusChange: (focused: boolean) => void
 }) {
-  const { ref, focused } = useFocusable({
+  const { ref, focused } = useFocusable<HTMLButtonElement>({
     isHeader: true,
     isSidebar: true,
     onSelect: () => item.onSelect?.(),
@@ -68,7 +68,7 @@ function SidebarItemView({
 
   return (
     <button
-      ref={ref as React.RefObject<HTMLButtonElement>}
+      ref={ref}
       className={`sidebar__item${focused ? ' sidebar__item--focused' : ''}`}
       type="button"
       aria-label={item.label}

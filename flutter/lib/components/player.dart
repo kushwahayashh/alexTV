@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../api/stream.dart';
 import '../api/tmdb.dart';
 import '../focus/focus_engine.dart';
@@ -8,12 +7,6 @@ import '../focus/focusable.dart';
 import '../theme.dart';
 
 enum _Phase { loading, files, links, error }
-
-/// Method channel to the native full-screen ExoPlayer (see MainActivity /
-/// PlayerActivity on the Android side). Playback runs in a separate native
-/// Activity rather than an embedded platform view, so Flutter is out of the
-/// render path and the player stays smooth on low-power TV hardware.
-const _playerChannel = MethodChannel('com.example.alextv/player');
 
 /// Three-step playback modal:
 ///   1. Resolve movie → list video files
@@ -126,7 +119,7 @@ class _PlayerState extends State<Player> {
     // Activity; the Flutter modal stays mounted underneath and is revealed
     // again when the user backs out of the player.
     try {
-      await _playerChannel.invokeMethod('play', {
+      await playerChannel.invokeMethod('play', {
         'url': link.url,
         'ext': link.ext,
         'title': widget.title ?? widget.media.title,

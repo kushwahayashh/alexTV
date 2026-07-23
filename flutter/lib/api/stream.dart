@@ -5,9 +5,16 @@
 library;
 
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 const _base = 'https://alexhasitbig--alexstream-serve.modal.run';
+
+/// Method channel to the native full-screen ExoPlayer (see MainActivity /
+/// PlayerActivity on the Android side). Playback runs in a separate native
+/// Activity rather than an embedded platform view, so Flutter is out of the
+/// render path and the player stays smooth on low-power TV hardware.
+const playerChannel = MethodChannel('com.example.alextv/player');
 
 class VideoFile {
   final int fid;

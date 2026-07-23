@@ -157,7 +157,7 @@ function PlayerItem({
   onSelect: () => void
   autoFocus?: boolean
 }) {
-  const { ref, focused, focusSelf } = useFocusable({ onSelect })
+  const { ref, focused, focusSelf } = useFocusable<HTMLButtonElement>({ onSelect })
 
   useEffect(() => {
     if (autoFocus) focusSelf()
@@ -165,7 +165,7 @@ function PlayerItem({
 
   return (
     <button
-      ref={ref as React.RefObject<HTMLButtonElement>}
+      ref={ref}
       className={`player-item${focused ? ' player-item--focused' : ''}`}
       type="button"
     >
@@ -287,10 +287,10 @@ function PlayerControls({ title }: { title: string }) {
   const [progress, setProgress] = useState(0.32) // 0–1
   const duration = 7695 // 2:08:15 in seconds (placeholder)
 
-  const { ref: seekRef, focused: seekFocused } = useFocusable({ onSelect: () => {} })
-  const { ref: playRef, focused: playFocused } = useFocusable({ onSelect: () => {} })
-  const { ref: subRef, focused: subFocused } = useFocusable({ onSelect: () => {} })
-  const { ref: audioRef, focused: audioFocused } = useFocusable({ onSelect: () => {} })
+  const { ref: seekRef, focused: seekFocused } = useFocusable<HTMLDivElement>({ onSelect: () => {} })
+  const { ref: playRef, focused: playFocused } = useFocusable<HTMLButtonElement>({ onSelect: () => {} })
+  const { ref: subRef, focused: subFocused } = useFocusable<HTMLButtonElement>({ onSelect: () => {} })
+  const { ref: audioRef, focused: audioFocused } = useFocusable<HTMLButtonElement>({ onSelect: () => {} })
 
   // When the seekbar is focused, intercept left/right to seek instead of
   // letting the FocusEngine move focus to another control.
@@ -326,7 +326,7 @@ function PlayerControls({ title }: { title: string }) {
         <div className="player-seek">
           <span className="player-seek__time">{fmtTime(currentSec)}</span>
           <div
-            ref={seekRef as React.RefObject<HTMLDivElement>}
+            ref={seekRef}
             className={`player-seek__bar${seekFocused ? ' player-seek__bar--focused' : ''}`}
           >
             <div className="player-seek__fill" style={{ width: pct }} />
@@ -337,7 +337,7 @@ function PlayerControls({ title }: { title: string }) {
 
         <div className="player-controls-row">
           <button
-            ref={playRef as React.RefObject<HTMLButtonElement>}
+            ref={playRef}
             className={`player-pill-btn${playFocused ? ' player-pill-btn--focused' : ''}`}
             type="button"
           >
@@ -345,14 +345,14 @@ function PlayerControls({ title }: { title: string }) {
           </button>
           <div style={{ flex: 1 }} />
           <button
-            ref={subRef as React.RefObject<HTMLButtonElement>}
+            ref={subRef}
             className={`player-pill-btn${subFocused ? ' player-pill-btn--focused' : ''}`}
             type="button"
           >
             Subtitles
           </button>
           <button
-            ref={audioRef as React.RefObject<HTMLButtonElement>}
+            ref={audioRef}
             className={`player-pill-btn${audioFocused ? ' player-pill-btn--focused' : ''}`}
             type="button"
           >
@@ -366,7 +366,7 @@ function PlayerControls({ title }: { title: string }) {
 
 /* ---------- Error state ---------- */
 function ErrorState({ error, onClose }: { error: string; onClose: () => void }) {
-  const { ref, focused, focusSelf } = useFocusable({ onSelect: onClose })
+  const { ref, focused, focusSelf } = useFocusable<HTMLButtonElement>({ onSelect: onClose })
 
   useEffect(() => {
     focusSelf()
@@ -376,7 +376,7 @@ function ErrorState({ error, onClose }: { error: string; onClose: () => void }) 
     <div className="player-modal">
       <p className="player-error-text">{error}</p>
       <button
-        ref={ref as React.RefObject<HTMLButtonElement>}
+        ref={ref}
         className={`header-btn${focused ? ' header-btn--focused' : ''}`}
         type="button"
       >

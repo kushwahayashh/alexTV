@@ -30,7 +30,7 @@ class _HomeState extends State<Home> with RouteAware {
   // screen (rails + every poster viewport), which a setState here would.
   final _heroIndex = ValueNotifier<int>(0);
   Timer? _rotateTimer;
-  _Status _status = _Status.loading;
+  LoadStatus _status = LoadStatus.loading;
 
   @override
   void initState() {
@@ -58,13 +58,13 @@ class _HomeState extends State<Home> with RouteAware {
             .where((m) => m.backdropPath != null)
             .take(10)
             .toList();
-        _status = _Status.ready;
+        _status = LoadStatus.ready;
       });
       _heroIndex.value = 0;
       _startRotation();
     } catch (e) {
       debugPrint('$e');
-      if (mounted) setState(() => _status = _Status.error);
+      if (mounted) setState(() => _status = LoadStatus.error);
     }
   }
 
@@ -137,11 +137,12 @@ class _HomeState extends State<Home> with RouteAware {
 
   Widget _buildBody() {
     switch (_status) {
-      case _Status.loading:
+      case LoadStatus.idle:
+      case LoadStatus.loading:
         return const _ScreenLoader();
-      case _Status.error:
+      case LoadStatus.error:
         return const _ScreenMsg('Failed to load. Check the network / API key.');
-      case _Status.ready:
+      case LoadStatus.ready:
         // Wire sidebar items to real handlers. Home is the active screen so
         // Home is a no-op; the rest are placeholders pending their own screens.
         final navItems = withHandlers({
@@ -208,8 +209,6 @@ class _HomeState extends State<Home> with RouteAware {
     }
   }
 }
-
-enum _Status { loading, ready, error }
 
 /// Full-screen loading state: the classic Apple activity spinner, centred.
 /// [radius] is in design units — the app-wide DesignScaler upscales it to the

@@ -2,20 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../api/library.dart';
+import '../api/stream.dart';
 import '../components/sidebar.dart';
 import '../focus/focus_engine.dart';
 import '../focus/focusable.dart';
 import '../main.dart' show openSearch;
 import '../theme.dart';
-
-enum _Status { loading, ready, error }
-
-/// Method channel to the native full-screen ExoPlayer (see MainActivity /
-/// PlayerActivity). Same channel the Details Player uses; the Library resolves
-/// a direct stream URL and launches playback with no quality/file picker.
-const _playerChannel = MethodChannel('com.example.alextv/player');
 
 /// Fetch saved watch-progress for [paths] from the native store. Returns a map
 /// of backend path -> progress fraction (0..1). Empty on any error or when
@@ -23,7 +16,7 @@ const _playerChannel = MethodChannel('com.example.alextv/player');
 Future<Map<String, double>> fetchPlaybackProgress(List<String> paths) async {
   if (paths.isEmpty) return const {};
   try {
-    final raw = await _playerChannel.invokeMethod<String>('getProgress', {
+    final raw = await playerChannel.invokeMethod<String>('getProgress', {
       'paths': paths,
     });
     if (raw == null || raw.isEmpty) return const {};
@@ -63,7 +56,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
   /// Backend path of the current level; "/" is the root.
   String _path = '/';
   LibraryListing? _listing;
-  _Status _status = _Status.loading;
+  LoadStatus _status = LoadStatus.loading;
 
   /// Watch-progress fraction (0..1) per file path, read back from the native
   /// store. Only files with a saved position appear; missing = no bar.
@@ -93,13 +86,13 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
   }
 
   Future<void> _load(String path) async {
-    setState(() => _status = _Status.loading);
+    setState(() => _status = LoadStatus.loading);
     try {
       final data = await fetchLibrary(path);
       if (!mounted || path != _path) return;
       setState(() {
         _listing = data;
-        _status = _Status.ready;
+        _status = LoadStatus.ready;
       });
       // Drilling into a folder disposes the previously focused row, so focus is
       // left cleared (see FocusController.unregister). Seat it on the first row
@@ -114,7 +107,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('$e');
       if (!mounted || path != _path) return;
-      setState(() => _status = _Status.error);
+      setState(() => _status = LoadStatus.error);
     }
   }
 
@@ -149,7 +142,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
       if (!mounted) return;
       final dot = file.name.lastIndexOf('.');
       final ext = dot >= 0 ? file.name.substring(dot + 1) : '';
-      await _playerChannel.invokeMethod('play', {
+      await playerChannel.invokeMethod('play', {
         'url': url,
         'ext': ext,
         'title': file.name,
@@ -263,7 +256,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
   /// [SliverList.builder] means each row (and its focus registration) is created
   /// only as it scrolls near the viewport, so large folders stay responsive.
   Widget _bodySliver() {
-    if (_status == _Status.loading) {
+    if (_status == LoadStatus.loading) {
       // The body starts ~84 design units below the top (top padding + header
       // row + gap). To land the spinner at true screen centre we subtract that
       // offset twice: the box centre is at offset + (height-2*offset)/2 =
@@ -280,7 +273,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
         ),
       );
     }
-    if (_status == _Status.error) {
+    if (_status == LoadStatus.error) {
       return const SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 120),

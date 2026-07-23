@@ -49,3 +49,6 @@ class AppSizes {
   static const libraryRowScrollLift = 150.0; // Library file rows
   static const searchResultScrollLift = 130.0; // Search result grid
 }
+
+/// Shared loading-state enum used by all screens.
+enum LoadStatus { idle, loading, ready, error }

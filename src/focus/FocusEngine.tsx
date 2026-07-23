@@ -507,7 +507,7 @@ let idCounter = 0
 /**
  * Register a focusable node. Returns a ref to attach and whether it is focused.
  */
-export function useFocusable(opts?: {
+export function useFocusable<T extends HTMLElement = HTMLElement>(opts?: {
   onSelect?: () => void
   onFocus?: () => void
   isHeader?: boolean
@@ -523,7 +523,7 @@ export function useFocusable(opts?: {
   if (!idRef.current) idRef.current = `f${idCounter++}`
   const id = idRef.current
 
-  const ref = useRef<HTMLElement | null>(null)
+  const ref = useRef<T | null>(null)
   const optsRef = useRef(opts)
   optsRef.current = opts
 
@@ -560,7 +560,7 @@ export function useFocusable(opts?: {
   }, [id, opts?.active])
 
   return {
-    ref: ref as React.RefObject<any>,
+    ref: ref as React.RefObject<T>,
     focused: ctx.focusId === id,
     focusSelf: () => ctx.setFocus(id),
   }

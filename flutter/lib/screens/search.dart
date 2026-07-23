@@ -9,8 +9,6 @@ import '../theme.dart';
 
 const _debounceMs = 350;
 
-enum _Status { idle, loading, ready }
-
 class Search extends StatefulWidget {
   const Search({super.key});
 
@@ -28,7 +26,7 @@ class _SearchState extends State<Search> {
   late final int _fieldId;
   Timer? _debounce;
   List<api.Media> _results = [];
-  _Status _status = _Status.idle;
+  LoadStatus _status = LoadStatus.idle;
 
   @override
   void initState() {
@@ -58,26 +56,26 @@ class _SearchState extends State<Search> {
     if (q.isEmpty) {
       setState(() {
         _results = [];
-        _status = _Status.idle;
+        _status = LoadStatus.idle;
       });
       return;
     }
 
-    setState(() => _status = _Status.loading);
+    setState(() => _status = LoadStatus.loading);
     _debounce = Timer(const Duration(milliseconds: _debounceMs), () async {
       try {
         final items = await api.searchMulti(q);
         if (!mounted || q != _queryController.text.trim()) return;
         setState(() {
           _results = items;
-          _status = _Status.ready;
+          _status = LoadStatus.ready;
         });
       } catch (e) {
         debugPrint('$e');
         if (!mounted || q != _queryController.text.trim()) return;
         setState(() {
           _results = [];
-          _status = _Status.ready;
+          _status = LoadStatus.ready;
         });
       }
     });
@@ -211,7 +209,7 @@ class _SearchField extends StatelessWidget {
 }
 
 class _SearchBody extends StatelessWidget {
-  final _Status status;
+  final LoadStatus status;
   final List<api.Media> results;
   final String query;
   final ScrollController pageController;
@@ -227,7 +225,7 @@ class _SearchBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (status == _Status.loading) {
+    if (status == LoadStatus.loading) {
       return Wrap(
         spacing: AppSizes.posterGap,
         runSpacing: 32,
@@ -235,7 +233,7 @@ class _SearchBody extends StatelessWidget {
       );
     }
 
-    if (status == _Status.ready && results.isEmpty) {
+    if (status == LoadStatus.ready && results.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 4),
         child: Text(

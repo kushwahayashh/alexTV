@@ -9,7 +9,7 @@ export function PosterCard({
   media: Media
   onSelect: (m: Media) => void
 }) {
-  const { ref, focused } = useFocusable({
+  const { ref, focused } = useFocusable<HTMLDivElement>({
     onSelect: () => onSelect(media),
   })
 

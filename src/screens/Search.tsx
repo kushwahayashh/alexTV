@@ -20,7 +20,7 @@ export function Search({ onSelect }: { onSelect: (m: Media) => void }) {
   const [results, setResults] = useState<Media[]>([])
   const [status, setStatus] = useState<Status>('idle')
 
-  const field = useFocusable({
+  const field = useFocusable<HTMLInputElement>({
     isInput: true,
     // When the engine focuses the field, give the real input DOM focus so the
     // caret shows and keystrokes register.
@@ -83,7 +83,7 @@ export function Search({ onSelect }: { onSelect: (m: Media) => void }) {
           <line x1="16.5" y1="16.5" x2="21" y2="21" />
         </svg>
         <input
-          ref={field.ref as React.RefObject<HTMLInputElement>}
+          ref={field.ref}
           className="search__input"
           type="text"
           placeholder="Search movies & series…"

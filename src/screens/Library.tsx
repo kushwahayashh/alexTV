@@ -108,14 +108,14 @@ function Breadcrumb({
   // The whole bar is one focusable item, like a list row. Selecting it climbs
   // one folder up (to the parent of the current level).
   const parentTarget = crumbs.length > 1 ? crumbs[crumbs.length - 2].target : '/'
-  const { ref, focused } = useFocusable({
+  const { ref, focused } = useFocusable<HTMLDivElement>({
     scrollMode: 'nearest',
     onSelect: () => onNavigate(parentTarget),
   })
 
   return (
     <div
-      ref={ref as React.RefObject<HTMLDivElement>}
+      ref={ref}
       className={`library__crumbbar${
         focused ? ' library__crumbbar--focused' : ''
       }`}
@@ -171,7 +171,7 @@ function Row({
 }) {
   const isFolder = item.type === 'folder'
   const progress = mockProgress(item)
-  const { ref, focused } = useFocusable({
+  const { ref, focused } = useFocusable<HTMLDivElement>({
     scrollMode: 'nearest',
     onSelect: () => {
       if (isFolder) onOpenFolder(item.path)
