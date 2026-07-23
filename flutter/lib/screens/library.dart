@@ -7,7 +7,7 @@ import '../api/stream.dart';
 import '../components/sidebar.dart';
 import '../focus/focus_engine.dart';
 import '../focus/focusable.dart';
-import '../main.dart' show openSearch;
+import '../main.dart' show openSearch, runUpdate;
 import '../theme.dart';
 
 /// Fetch saved watch-progress for [paths] from the native store. Returns a map
@@ -182,6 +182,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
     final navItems = withHandlers({
       NavId.home: () => Navigator.of(context).maybePop(),
       NavId.search: () => openSearch(context),
+      NavId.update: () => runUpdate(context),
     });
     return PopScope(
       // At root, let Back pop the whole Library route. Drilled into a folder,

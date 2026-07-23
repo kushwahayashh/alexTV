@@ -6,7 +6,7 @@ import '../components/hero.dart' as ui;
 import '../components/rail.dart';
 import '../components/sidebar.dart';
 import '../focus/focus_engine.dart';
-import '../main.dart' show openDetails, openSearch, openLibrary, routeObserver;
+import '../main.dart' show openDetails, openSearch, openLibrary, runUpdate, routeObserver;
 import '../theme.dart';
 
 const _heroRotateMs = 10000;
@@ -148,6 +148,7 @@ class _HomeState extends State<Home> with RouteAware {
         final navItems = withHandlers({
           NavId.search: () => openSearch(context),
           NavId.library: () => openLibrary(context),
+          NavId.update: () => runUpdate(context),
         });
         return Stack(
           children: [

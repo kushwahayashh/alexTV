@@ -7,6 +7,7 @@ import 'screens/search.dart';
 import 'screens/library.dart';
 import 'screens/details.dart';
 import 'theme.dart';
+import 'update/updater.dart';
 
 void main() {
   runApp(const AlexTvApp());
@@ -63,6 +64,25 @@ void openSearch(BuildContext context) {
 /// within the screen; Back climbs folders before popping back to Home.
 void openLibrary(BuildContext context) {
   pushGuarded(context, fadeRoute(const Library()));
+}
+
+/// Runs the self-update flow behind the sidebar's Update item: downloads the
+/// latest release APK and hands it to Android's installer. Shows a SnackBar
+/// while downloading and another if it fails, so the user gets feedback even
+/// though the rail item can't carry a "Downloading…" state of its own.
+Future<void> runUpdate(BuildContext context) async {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.showSnackBar(
+    const SnackBar(content: Text('Downloading update…')),
+  );
+  try {
+    await Updater.downloadAndInstall();
+  } catch (e) {
+    debugPrint('Update failed: $e');
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Update failed. Check the connection.')),
+    );
+  }
 }
 
 /// Lays the app out at a fixed [AppSizes.designWidth] and uniformly scales it
