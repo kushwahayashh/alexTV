@@ -16,12 +16,7 @@ export default function App() {
   const libraryPathRef = useRef('/')
   // Imperative handle into the focus engine, populated by FocusProvider.
   const focusApi = useRef<FocusApi | null>(null)
-  // The card/button focused before we pushed the next screen, so Back can
-  // return focus there instead of dumping the user at the first item. One slot
-  // per layer: search remembers the Home button, details remembers the card
-  // (on Home or in Search) it was opened from.
-  const searchReturnFocus = useRef<string | null>(null)
-  const libraryReturnFocus = useRef<string | null>(null)
+  // The card focused before Details was opened, so Back can restore it.
   const detailsReturnFocus = useRef<string | null>(null)
 
   // Open Details from whichever screen is on top; remember the focused item.
@@ -41,38 +36,34 @@ export default function App() {
     })
   }, [])
 
-  // Open Search from Home; remember the focused Home button.
+  // Open Search from Home.
   const handleOpenSearch = useCallback(() => {
-    searchReturnFocus.current = focusApi.current?.getFocusId() ?? null
     setShowSearch(true)
   }, [])
 
-  // Back from Search: return to Home and restore the button that opened it.
+  // Back from Search: return to Home.
   const handleCloseSearch = useCallback(() => {
     setShowSearch(false)
-    const saved = searchReturnFocus.current
-    if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
   }, [])
 
-  // Open Library from Home; remember the focused Home button and start at root.
+  // Open Library from Home; start at root.
   const handleOpenLibrary = useCallback(() => {
-    libraryReturnFocus.current = focusApi.current?.getFocusId() ?? null
     libraryPathRef.current = '/'
     setLibraryPath('/')
     setShowLibrary(true)
   }, [])
 
-  // Fully close Library and restore the button that opened it (Home button).
+  // Fully close Library and return to Home with the hero visible and sidebar
+  // collapsed (no focus restoration — the saved focus was a sidebar item which
+  // would re-expand the sidebar).
   const handleExitLibrary = useCallback(() => {
     setShowLibrary(false)
     libraryPathRef.current = '/'
     setLibraryPath('/')
-    const saved = libraryReturnFocus.current
-    if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
   }, [])
 
   // Back from Library: climb into the current folder's parent if we're drilled
-  // in, otherwise close the screen and restore the button that opened it.
+  // in, otherwise close the screen and return to Home.
   const handleCloseLibrary = useCallback(() => {
     const cur = libraryPathRef.current
     if (cur !== '/') {
@@ -81,8 +72,6 @@ export default function App() {
       setLibraryPath(parent)
     } else {
       setShowLibrary(false)
-      const saved = libraryReturnFocus.current
-      if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
     }
   }, [])
 

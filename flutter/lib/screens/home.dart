@@ -202,7 +202,7 @@ class _HomeState extends State<Home> with RouteAware {
               left: 0,
               top: 0,
               bottom: 0,
-              child: Sidebar(items: navItems),
+              child: Sidebar(items: navItems, currentId: NavId.home),
             ),
           ],
         );

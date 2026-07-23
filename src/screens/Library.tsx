@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFocusable } from '../focus/FocusEngine'
 import { Sidebar, withHandlers } from '../components/Sidebar'
 import { Spinner } from '../components/Spinner'
@@ -51,7 +51,7 @@ export function Library({
 
   return (
     <div className="library">
-      <Sidebar items={withHandlers({ home: onGoHome })} />
+      <Sidebar items={withHandlers({ home: onGoHome })} currentId="library" />
 
       <Breadcrumb path={path} onNavigate={onOpenFolder} />
 
@@ -108,10 +108,17 @@ function Breadcrumb({
   // The whole bar is one focusable item, like a list row. Selecting it climbs
   // one folder up (to the parent of the current level).
   const parentTarget = crumbs.length > 1 ? crumbs[crumbs.length - 2].target : '/'
-  const { ref, focused } = useFocusable<HTMLDivElement>({
+  const { ref, focused, focusSelf } = useFocusable<HTMLDivElement>({
     scrollMode: 'nearest',
     onSelect: () => onNavigate(parentTarget),
   })
+
+  const focusSelfRef = useRef(focusSelf)
+  focusSelfRef.current = focusSelf
+
+  useEffect(() => {
+    focusSelfRef.current()
+  }, [path])
 
   return (
     <div

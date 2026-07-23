@@ -26,6 +26,7 @@ class _Entry {
   // `_headerIds` so the header Left/Right walk never lands on a rail item.
   final bool isSidebar;
   final bool isInput;
+  final bool isCurrent;
   bool active;
   _Entry(
     this.id,
@@ -35,6 +36,7 @@ class _Entry {
     this.isHeader,
     this.isSidebar,
     this.isInput,
+    this.isCurrent,
     this.active,
   );
 
@@ -53,6 +55,9 @@ class FocusController extends ChangeNotifier {
   int? _focusId;
   final _headerIds = <int>{}; // plain top-bar headers (NOT sidebar items)
   final _sidebarIds = <int>{}; // all sidebar rail focusables
+  // Content item that had focus before the sidebar rail was entered (via Left).
+  // On Right from the sidebar, focus returns here instead of jumping to the top.
+  int? _sidebarReturnFocus;
   int _counter = 0;
 
   // Rate-limit held-key (auto-repeat) navigation. A discrete press always moves
@@ -72,6 +77,7 @@ class FocusController extends ChangeNotifier {
     bool isHeader = false,
     bool isSidebar = false,
     bool isInput = false,
+    bool isCurrent = false,
     bool active = true,
   }) {
     final id = _counter++;
@@ -83,6 +89,7 @@ class FocusController extends ChangeNotifier {
       isHeader,
       isSidebar,
       isInput,
+      isCurrent,
       active,
     );
     if (isHeader) _headerIds.add(id);
@@ -218,7 +225,7 @@ class FocusController extends ChangeNotifier {
         bestR = r;
       }
     }
-    return best?.id ?? _firstSidebar();
+    return best?.id;
   }
 
   /// Next header in the pressed horizontal direction, or null if none.
@@ -252,14 +259,17 @@ class FocusController extends ChangeNotifier {
   /// order" here is registration order, which matches the visual top-to-bottom
   /// order of the rail.
   int? _firstSidebar() {
+    int? firstId;
+    int? currentId;
     for (final id in _sidebarIds) {
       final e = _entries[id];
       if (e == null || !e.active) continue;
       final r = e.rect;
       if (r == null || r.isEmpty) continue;
-      return id;
+      if (e.isCurrent) currentId = id;
+      firstId ??= id;
     }
-    return null;
+    return currentId ?? firstId;
   }
 
   /// Next sidebar item above/below the current one in the vertical rail.
@@ -393,7 +403,11 @@ class FocusController extends ChangeNotifier {
           final next = _nextSidebar(cur, dir);
           if (next != null) _setFocus(next);
         } else if (dir == Direction.right) {
-          if (onReleaseTop != null) {
+          final saved = _sidebarReturnFocus;
+          _sidebarReturnFocus = null;
+          if (saved != null && _entries.containsKey(saved)) {
+            _setFocus(saved);
+          } else if (onReleaseTop != null) {
             clearFocus();
             onReleaseTop.call();
           } else {
@@ -430,6 +444,13 @@ class FocusController extends ChangeNotifier {
           if (first != null) _setFocus(first);
           return KeyEventResult.handled;
         }
+        if (dir == Direction.left) {
+          final sb = _firstSidebar();
+          if (sb != null) {
+            _setFocus(sb);
+            return KeyEventResult.handled;
+          }
+        }
         final first = _firstInOrder();
         if (first != null) _setFocus(first);
         return KeyEventResult.handled;
@@ -452,7 +473,10 @@ class FocusController extends ChangeNotifier {
         // Nothing to the left of the first column. If a sidebar rail is
         // present, jump into it (Hotstar/Netflix-style left rail).
         final sb = _firstSidebar();
-        if (sb != null) _setFocus(sb);
+        if (sb != null) {
+          _sidebarReturnFocus = cur;
+          _setFocus(sb);
+        }
       }
       return KeyEventResult.handled;
     }

@@ -241,7 +241,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  child: Sidebar(items: navItems),
+                  child: Sidebar(items: navItems, currentId: NavId.library),
                 ),
               ],
             ),

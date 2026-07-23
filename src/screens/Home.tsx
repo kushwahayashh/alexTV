@@ -71,7 +71,7 @@ export function Home({
 
   return (
     <div className="home">
-      <Sidebar items={navItems} />
+      <Sidebar items={navItems} currentId="home" />
       <div className="home__hero-wrap">
         <Hero media={featured[heroIndex] ?? null} />
       </div>

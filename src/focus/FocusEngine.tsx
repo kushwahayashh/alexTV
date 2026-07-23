@@ -47,6 +47,7 @@ type FocusableEntry = {
   // Text input: typing, Space, Backspace and Left/Right (caret) pass through to
   // the field; only Up (header) and Down/Enter (into the grid) navigate away.
   isInput?: boolean
+  isCurrent?: boolean
   // 'top' scrolls the nearest scroll container fully to the top on focus (used
   // by hero action buttons so focusing them shows the whole hero instead of
   // lifting the button to the viewport top). 'nearest' scrolls only enough to
@@ -145,6 +146,9 @@ export function FocusProvider({
   focusIdRef.current = focusId
   const headerIdsRef = useRef<Set<string>>(new Set())
   const sidebarIdsRef = useRef<Set<string>>(new Set())
+  // Content item that had focus before the sidebar rail was entered (via Left).
+  // On Right from the sidebar, focus returns here instead of jumping to the top.
+  const sidebarReturnFocus = useRef<string | null>(null)
 
   const setFocus = useCallback((id: string) => {
     if (!entries.current.has(id)) return
@@ -263,7 +267,8 @@ export function FocusProvider({
     const heroes = document.querySelectorAll('.hero, .details__hero')
     for (const el of heroes) {
       const r = (el as HTMLElement).getBoundingClientRect()
-      if (r.width > 0 || r.height > 0) return true
+      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight)
+        return true
     }
     return false
   }, [])
@@ -275,6 +280,8 @@ export function FocusProvider({
     for (const id of headerIdsRef.current) {
       const e = entries.current.get(id)
       if (!e) continue
+      // Sidebar items are in headerIdsRef but reached only via LEFT, not UP.
+      if (e.isSidebar) continue
       // Skip hidden headers (zero rect), e.g. Home's header behind Details.
       const r = rectOf(e.element)
       if (r.width <= 0 && r.height <= 0) continue
@@ -300,6 +307,7 @@ export function FocusProvider({
         if (id === currentId) continue
         const e = entries.current.get(id)
         if (!e) continue
+        if (e.isSidebar) continue
         const to = rectOf(e.element)
         // Skip hidden headers (zero rect), e.g. Home's header sitting mounted
         // behind the Search screen.
@@ -318,11 +326,13 @@ export function FocusProvider({
   // reaches sideways for the rail (Left from the leftmost column).
   const firstSidebar = useCallback((): FocusableEntry | null => {
     let first: FocusableEntry | null = null
+    let current: FocusableEntry | null = null
     for (const id of sidebarIdsRef.current) {
       const e = entries.current.get(id)
       if (!e) continue
       const r = rectOf(e.element)
       if (r.width <= 0 && r.height <= 0) continue
+      if (e.isCurrent) current = e
       if (
         !first ||
         e.element.compareDocumentPosition(first.element) &
@@ -331,7 +341,7 @@ export function FocusProvider({
         first = e
       }
     }
-    return first
+    return current ?? first
   }, [])
 
   // Next sidebar item above/below the current one in the vertical rail.
@@ -369,13 +379,18 @@ export function FocusProvider({
       if (e.key in dirMap) {
         const cur = focusIdRef.current
         const dir = dirMap[e.key]
-        // Entry may be stale (leftover from a previous screen). Treat it as
+        const curEntry = cur != null ? entries.current.get(cur) : null
+        // Entry may be stale (leftover from a previous screen, now hidden
+        // behind another screen with display:none — zero rect). Treat it as
         // no-focus so the first keypress on the new screen seeds correctly.
-        const curAlive = cur != null && entries.current.has(cur)
+        const curAlive = curEntry != null && (() => {
+          const r = curEntry.element.getBoundingClientRect()
+          return r.width > 0 || r.height > 0
+        })()
 
         // Text input focused: Left/Right belong to the caret — let the browser
         // handle them and don't navigate away. Up/Down still leave the field.
-        if (curAlive && entries.current.get(cur!)?.isInput) {
+        if (curAlive && curEntry!.isInput) {
           if (dir === 'left' || dir === 'right') return
           e.preventDefault()
           if (dir === 'up') {
@@ -392,13 +407,18 @@ export function FocusProvider({
         e.preventDefault()
 
         // Sidebar item focused: Up/Down walks the vertical rail, Right drops
-        // into the content (hero first if there is one), Left is a no-op.
+        // into the content (restoring the item that had focus before the sidebar
+        // was opened), Left is a no-op.
         if (curAlive && sidebarIdsRef.current.has(cur!)) {
           if (dir === 'up' || dir === 'down') {
             const next = nextSidebar(cur!, dir)
             if (next) setFocus(next)
           } else if (dir === 'right') {
-            if (heroVisible()) {
+            const saved = sidebarReturnFocus.current
+            sidebarReturnFocus.current = null
+            if (saved && entries.current.has(saved)) {
+              setFocus(saved)
+            } else if (heroVisible()) {
               releaseToTop()
             } else {
               const first = firstInDomOrder()
@@ -432,6 +452,13 @@ export function FocusProvider({
             if (first) setFocus(first.id)
             return
           }
+          if (dir === 'left') {
+            const sb = firstSidebar()
+            if (sb) {
+              setFocus(sb.id)
+              return
+            }
+          }
           const first = firstInDomOrder()
           if (first) setFocus(first.id)
           return
@@ -453,7 +480,10 @@ export function FocusProvider({
           // Nothing to the left of the first column. If a sidebar rail is
           // present, jump into it (Hotstar/Netflix-style left rail).
           const sb = firstSidebar()
-          if (sb) setFocus(sb.id)
+          if (sb) {
+            sidebarReturnFocus.current = cur
+            setFocus(sb.id)
+          }
         }
         return
       }
@@ -513,6 +543,7 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(opts?: {
   isHeader?: boolean
   isSidebar?: boolean
   isInput?: boolean
+  isCurrent?: boolean
   scrollMode?: 'start' | 'top' | 'nearest'
   active?: boolean
 }) {
@@ -548,6 +579,7 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(opts?: {
       isHeader: optsRef.current?.isHeader,
       isSidebar: optsRef.current?.isSidebar,
       isInput: optsRef.current?.isInput,
+      isCurrent: optsRef.current?.isCurrent,
       scrollMode: optsRef.current?.scrollMode,
       active: optsRef.current?.active !== false,
     })

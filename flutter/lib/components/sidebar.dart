@@ -57,7 +57,8 @@ List<NavItem> withHandlers(Map<NavId, VoidCallback?> handlers) {
 /// feels like a hover-out rather than a snap.
 class Sidebar extends StatefulWidget {
   final List<NavItem> items;
-  const Sidebar({super.key, required this.items});
+  final NavId? currentId;
+  const Sidebar({super.key, required this.items, this.currentId});
 
   @override
   State<Sidebar> createState() => _SidebarState();
@@ -88,6 +89,7 @@ class _SidebarState extends State<Sidebar> {
             // content) and must stay out of _headerIds so _firstHeader /
             // _nextHeader — which drive the top-bar pill nav — never scan them.
             isSidebar: true,
+            isCurrent: widget.items[i].id == widget.currentId,
           ),
         );
       }

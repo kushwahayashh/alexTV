@@ -51,14 +51,17 @@ export function withHandlers(
 
 function SidebarItemView({
   item,
+  isCurrent,
   onFocusChange,
 }: {
   item: SidebarItem
+  isCurrent?: boolean
   onFocusChange: (focused: boolean) => void
 }) {
   const { ref, focused } = useFocusable<HTMLButtonElement>({
     isHeader: true,
     isSidebar: true,
+    isCurrent,
     onSelect: () => item.onSelect?.(),
   })
 
@@ -79,7 +82,13 @@ function SidebarItemView({
   )
 }
 
-export function Sidebar({ items }: { items: SidebarItem[] }) {
+export function Sidebar({
+  items,
+  currentId,
+}: {
+  items: SidebarItem[]
+  currentId?: string
+}) {
   // Count of currently-focused items (at most one). The rail expands whenever
   // that count is > 0. Using a counter (not a boolean) keeps the expand state
   // correct as focus hops between adjacent items: blur fires before focus, so
@@ -102,6 +111,7 @@ export function Sidebar({ items }: { items: SidebarItem[] }) {
           <SidebarItemView
             key={item.id}
             item={item}
+            isCurrent={item.id === currentId}
             onFocusChange={onFocusChange}
           />
         ))}
