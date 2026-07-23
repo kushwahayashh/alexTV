@@ -13,6 +13,7 @@ export default function App() {
   const [showLibrary, setShowLibrary] = useState(false)
   // Backend path of the current library level; "/" is the root.
   const [libraryPath, setLibraryPath] = useState('/')
+  const libraryPathRef = useRef('/')
   // Imperative handle into the focus engine, populated by FocusProvider.
   const focusApi = useRef<FocusApi | null>(null)
   // The card/button focused before we pushed the next screen, so Back can
@@ -56,6 +57,7 @@ export default function App() {
   // Open Library from Home; remember the focused Home button and start at root.
   const handleOpenLibrary = useCallback(() => {
     libraryReturnFocus.current = focusApi.current?.getFocusId() ?? null
+    libraryPathRef.current = '/'
     setLibraryPath('/')
     setShowLibrary(true)
   }, [])
@@ -63,6 +65,7 @@ export default function App() {
   // Fully close Library and restore the button that opened it (Home button).
   const handleExitLibrary = useCallback(() => {
     setShowLibrary(false)
+    libraryPathRef.current = '/'
     setLibraryPath('/')
     const saved = libraryReturnFocus.current
     if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
@@ -71,16 +74,20 @@ export default function App() {
   // Back from Library: climb into the current folder's parent if we're drilled
   // in, otherwise close the screen and restore the button that opened it.
   const handleCloseLibrary = useCallback(() => {
-    setLibraryPath((cur) => {
-      if (cur !== '/') return parentOf(cur)
+    const cur = libraryPathRef.current
+    if (cur !== '/') {
+      const parent = parentOf(cur)
+      libraryPathRef.current = parent
+      setLibraryPath(parent)
+    } else {
       setShowLibrary(false)
       const saved = libraryReturnFocus.current
       if (saved) requestAnimationFrame(() => focusApi.current?.setFocus(saved))
-      return cur
-    })
+    }
   }, [])
 
   const handleOpenFolder = useCallback((folderPath: string) => {
+    libraryPathRef.current = folderPath
     setLibraryPath(folderPath)
   }, [])
 

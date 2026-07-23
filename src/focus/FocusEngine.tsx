@@ -505,17 +505,6 @@ export function FocusProvider({
 let idCounter = 0
 
 /**
- * Read the live focus id from inside a FocusProvider. Used by components that
- * need to react to which focusable is currently active (e.g. a sidebar that
- * expands when any of its items holds focus).
- */
-export function useFocusId(): string | null {
-  const ctx = useContext(FocusContext)
-  if (!ctx) throw new Error('useFocusId must be used within a FocusProvider')
-  return ctx.focusId
-}
-
-/**
  * Register a focusable node. Returns a ref to attach and whether it is focused.
  */
 export function useFocusable(opts?: {

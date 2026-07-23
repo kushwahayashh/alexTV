@@ -75,14 +75,12 @@ class StreamLink {
   final String quality;
   final String ext;
   final String speed;
-  final String proxiedUrl;
 
   const StreamLink({
     required this.url,
     required this.quality,
     required this.ext,
     required this.speed,
-    required this.proxiedUrl,
   });
 
   factory StreamLink.fromJson(Map<String, dynamic> j) => StreamLink(
@@ -90,7 +88,6 @@ class StreamLink {
     quality: (j['quality'] ?? '') as String,
     ext: (j['ext'] ?? '') as String,
     speed: (j['speed'] ?? '') as String,
-    proxiedUrl: (j['proxiedUrl'] ?? '') as String,
   );
 }
 

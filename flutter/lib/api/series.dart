@@ -53,7 +53,8 @@ List<SeasonOption> buildSeasons(List<Folder> folders) {
 }
 
 int _resRank(String? resLabel) {
-  return int.tryParse(resLabel ?? '') ?? 0;
+  final match = RegExp(r'\d+').firstMatch(resLabel ?? '');
+  return match == null ? 0 : int.parse(match.group(0)!);
 }
 
 List<VideoFile> bestPerEpisode(List<VideoFile> episodes) {

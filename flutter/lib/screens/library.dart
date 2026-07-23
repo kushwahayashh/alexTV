@@ -46,7 +46,8 @@ Future<Map<String, double>> fetchPlaybackProgress(List<String> paths) async {
 /// File-manager style library, backed by the AlexTV Library backend. The
 /// current path is held in state; the global Back button climbs into the
 /// parent folder if we're drilled in, otherwise it pops the screen. Selecting a
-/// folder drills into it; selecting a file will play it (wiring lands later).
+/// folder drills into it; selecting a file resolves a stream URL and launches
+/// the native player.
 class Library extends StatefulWidget {
   const Library({super.key});
 
@@ -145,6 +146,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
     // quality/file picker — launch straight into playback.
     try {
       final url = await fetchStreamUrl(file.path);
+      if (!mounted) return;
       final dot = file.name.lastIndexOf('.');
       final ext = dot >= 0 ? file.name.substring(dot + 1) : '';
       await _playerChannel.invokeMethod('play', {

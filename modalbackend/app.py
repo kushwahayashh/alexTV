@@ -43,8 +43,6 @@ import anyio
 try:
     import modal
 except ImportError:
-    # Optional: only the Modal deploy needs it. local.py runs with just
-    # fastapi + uvicorn, so tolerate its absence there.
     modal = None
 
 from terminal import add_terminal_routes
@@ -446,8 +444,7 @@ def create_api_app(activity: _ActivityTracker, tunnel_info: dict):
     return api_app
 
 
-# --- Modal deployment (skipped entirely when modal isn't installed, e.g. in
-#     local.py dev, which imports this module just for the app factory). ---
+# --- Modal deployment (skipped when modal isn't installed). ---
 if modal is not None:
     _here = os.path.dirname(__file__)
     image = (

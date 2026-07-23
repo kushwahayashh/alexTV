@@ -14,13 +14,11 @@ export type SeasonOption = {
   number: number
 }
 
-// A real season folder is named like "season 1", "Season 01", or "S1"
-// (excludes junk folders like "Downloads", "Subs").
-export function isSeasonFolder(folder: Folder): boolean {
+function isSeasonFolder(folder: Folder): boolean {
   return /^\s*(season\s*\d{1,2}|s\d{1,2})\s*$/i.test(folder.file_name || '')
 }
 
-export function seasonNumber(folder: Folder): number {
+function seasonNumber(folder: Folder): number {
   const m = (folder.file_name || '').match(/\d+/)
   return m ? Number(m[0]) : 0
 }
@@ -58,7 +56,7 @@ function resRank(resLabel: string | null): number {
  * Collapse multiple source files of the same episode down to the highest
  * resolution. Files with an unrecognised episode number are kept as-is.
  */
-export function bestPerEpisode(episodes: VideoFile[]): VideoFile[] {
+function bestPerEpisode(episodes: VideoFile[]): VideoFile[] {
   const best = new Map<number, VideoFile>()
   const unknown: VideoFile[] = []
   for (const ep of episodes) {
@@ -75,7 +73,7 @@ export function bestPerEpisode(episodes: VideoFile[]): VideoFile[] {
 }
 
 /** Sort by episode number, then by resolution (highest first). */
-export function episodeSort(a: VideoFile, b: VideoFile): number {
+function episodeSort(a: VideoFile, b: VideoFile): number {
   return (
     (a.episode ?? 1e9) - (b.episode ?? 1e9) ||
     resRank(b.resLabel) - resRank(a.resLabel)

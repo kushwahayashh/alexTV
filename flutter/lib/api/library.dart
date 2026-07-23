@@ -17,31 +17,20 @@ class LibraryFile {
 
   /// Backend path, e.g. "/Breaking Bad/S01E01.mkv".
   final String path;
-  final int? size;
 
   /// Human-readable size badge, e.g. "2.4 GB".
   final String? sizeFormatted;
 
-  /// Filename-derived resolution badge, e.g. "1080p", or null if unknown.
-  final String? resolution;
-  final double mtime;
-
   const LibraryFile({
     required this.name,
     required this.path,
-    required this.size,
     required this.sizeFormatted,
-    required this.resolution,
-    required this.mtime,
   });
 
   factory LibraryFile.fromJson(Map<String, dynamic> j) => LibraryFile(
     name: (j['name'] ?? '') as String,
     path: (j['path'] ?? '') as String,
-    size: (j['size'] as num?)?.toInt(),
     sizeFormatted: j['sizeFormatted'] as String?,
-    resolution: j['resolution'] as String?,
-    mtime: (j['mtime'] as num?)?.toDouble() ?? 0,
   );
 }
 
@@ -50,22 +39,14 @@ class LibraryFolder {
   final String name;
   final String path;
 
-  /// Number of media items inside, for the folder badge.
-  final int itemCount;
-  final double mtime;
-
   const LibraryFolder({
     required this.name,
     required this.path,
-    required this.itemCount,
-    required this.mtime,
   });
 
   factory LibraryFolder.fromJson(Map<String, dynamic> j) => LibraryFolder(
     name: (j['name'] ?? '') as String,
     path: (j['path'] ?? '') as String,
-    itemCount: (j['itemCount'] as num?)?.toInt() ?? 0,
-    mtime: (j['mtime'] as num?)?.toDouble() ?? 0,
   );
 }
 

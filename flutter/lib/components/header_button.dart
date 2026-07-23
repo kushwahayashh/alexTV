@@ -5,7 +5,6 @@ import '../theme.dart';
 
 /// D-pad navigable pill button for the hero header bar. Registered as a
 /// focusable header item so it's reached by pressing Up from the hero.
-/// Mock for now — selecting it does nothing.
 class HeaderButton extends StatefulWidget {
   final String label;
   final VoidCallback? onFocused;

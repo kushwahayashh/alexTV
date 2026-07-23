@@ -3,8 +3,6 @@
  *
  * Talks to the AlexTV Library backend (FastAPI on Modal). The stable URL serves
  * the full API directly, so listing hits `/list?path=` straight against it.
- * Streaming should go through the fast tunnel — `fetchStreamUrl` resolves that
- * via `/download-url` when the player needs a URL to hand to the video element.
  */
 
 const LIBRARY_BASE = 'https://alexhasitbig--alextv-library-start.modal.run'
@@ -17,8 +15,6 @@ export type LibraryFile = {
   size: number | null
   /** Human-readable size badge, e.g. "2.4 GB". */
   sizeFormatted: string | null
-  /** Filename-derived resolution badge, e.g. "1080p", or null if unknown. */
-  resolution: string | null
   mtime: number
 }
 
@@ -51,26 +47,6 @@ export async function fetchLibrary(path: string): Promise<LibraryListing> {
     throw new Error(data.detail || 'Failed to load library')
   }
   return res.json()
-}
-
-/**
- * Resolve a playable stream URL for a file, preferring the fast tunnel the
- * backend hands back from `/download-url`. Falls back to a direct `/stream`
- * URL if that call fails.
- */
-export async function fetchStreamUrl(path: string): Promise<string> {
-  try {
-    const res = await fetch(
-      `${LIBRARY_BASE}/download-url?path=${encodeURIComponent(path)}`,
-    )
-    if (res.ok) {
-      const data = await res.json()
-      if (data.url) return data.url as string
-    }
-  } catch {
-    // fall through to the direct stream URL
-  }
-  return `${LIBRARY_BASE}/stream?path=${encodeURIComponent(path)}`
 }
 
 /** Parent path of a backend path, "/" at or above the root. */

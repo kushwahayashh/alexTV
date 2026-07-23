@@ -114,10 +114,7 @@ def add_terminal_routes(api_app, touch=None) -> None:
                     and len(buf) < max_batch_bytes
                 ):
                     return
-                try:
-                    payload = buf.decode("utf-8", errors="replace")
-                except Exception:
-                    payload = ""
+                payload = buf.decode("utf-8", errors="replace")
                 buf.clear()
                 last_send = now
                 if payload:
