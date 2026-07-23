@@ -11,6 +11,14 @@ import 'package:http/http.dart' as http;
 
 const _base = 'https://alexhasitbig--alextv-library-start.modal.run';
 
+/// Cloudflare Worker that proxies the library stream. The Modal tunnel is slow
+/// from some regions; routing the final URL through the worker speeds it up.
+/// The worker expects the target as a URL-encoded `?destination=` param.
+const _proxy = 'https://alextv.alexhasitbig.workers.dev/?destination=';
+
+/// Wrap a resolved stream URL so it streams through [_proxy].
+String _proxied(String url) => '$_proxy${Uri.encodeComponent(url)}';
+
 /// A playable media file in the library.
 class LibraryFile {
   final String name;
@@ -108,7 +116,8 @@ Future<LibraryListing> fetchLibrary(String path) async {
 
 /// Resolve a playable stream URL for a file, preferring the fast tunnel the
 /// backend hands back from `/download-url`. Falls back to a direct `/stream`
-/// URL if that call fails.
+/// URL if that call fails. Either way the final URL is wrapped through the
+/// Cloudflare [_proxy] so playback routes through the worker.
 Future<String> fetchStreamUrl(String path) async {
   try {
     final res = await http.get(
@@ -117,12 +126,12 @@ Future<String> fetchStreamUrl(String path) async {
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final url = data['url'];
-      if (url is String && url.isNotEmpty) return url;
+      if (url is String && url.isNotEmpty) return _proxied(url);
     }
   } catch (_) {
     // fall through to the direct stream URL
   }
-  return '$_base/stream?path=${Uri.encodeComponent(path)}';
+  return _proxied('$_base/stream?path=${Uri.encodeComponent(path)}');
 }
 
 /// Parent path of a backend path, "/" at or above the root.
