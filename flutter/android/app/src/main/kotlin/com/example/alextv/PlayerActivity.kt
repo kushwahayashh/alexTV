@@ -73,6 +73,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Shadow
@@ -124,13 +125,15 @@ private val FocusColor = Color(0xFFFFFFFF)
  * so the bright leader hands off spoke-to-spoke with a trailing fade — the
  * classic Cupertino look. Ported 1:1 from the web prototype's Spinner.tsx /
  * Flutter's CupertinoActivityIndicator so every surface shows the same loader.
+ * The fade is a solid grey→white color ramp (no transparency): the leader is
+ * pure white, each older spoke steps back toward the grey base color.
  */
 private const val SPINNER_SPOKES = 12
 
 @Composable
 private fun AppleSpinner(
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 36.dp,
+    size: androidx.compose.ui.unit.Dp = 52.dp,
     color: Color = MutedColor,
 ) {
     val transition = rememberInfiniteTransition(label = "spinner")
@@ -151,9 +154,10 @@ private fun AppleSpinner(
         val spokeLen = this.size.height * 0.26f
         val radius = this.size.width / 2f - spokeLen / 2f
         for (i in 0 until SPINNER_SPOKES) {
-            // Trailing fade: the leader is brightest, each older spoke dimmer.
+            // Trailing fade as a grey→white ramp: leader (t=1) is white, each
+            // older spoke steps back toward the grey base. Fully opaque.
             val dist = ((leader - i) + SPINNER_SPOKES) % SPINNER_SPOKES
-            val alpha = (SPINNER_SPOKES - dist).toFloat() / SPINNER_SPOKES
+            val t = (SPINNER_SPOKES - dist).toFloat() / SPINNER_SPOKES
             val angle = Math.toRadians((i * (360.0 / SPINNER_SPOKES)) - 90.0)
             val ex = cx + (radius * Math.cos(angle)).toFloat()
             val ey = cy + (radius * Math.sin(angle)).toFloat()
@@ -161,7 +165,7 @@ private fun AppleSpinner(
             val ux = Math.cos(angle).toFloat()
             val uy = Math.sin(angle).toFloat()
             drawLine(
-                color = color.copy(alpha = alpha),
+                color = lerp(color, Color.White, t),
                 start = Offset(ex - ux * half, ey - uy * half),
                 end = Offset(ex + ux * half, ey + uy * half),
                 strokeWidth = spokeW,

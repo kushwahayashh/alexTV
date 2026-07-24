@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { Spinner } from './Spinner'
 
 /**
  * Standalone video player UI for iterating on the controls overlay.
@@ -417,6 +418,25 @@ export function VideoPlayer({
 
   const progress = duration > 0 ? position / duration : 0
   const pct = `${(progress * 100).toFixed(1)}%`
+
+  // Always-loading state for iterating on the loader. Mirrors PlayerActivity's
+  // `!initialized -> AppleSpinner(...)` branch: just the centered spinner over
+  // the video, controls/menus hidden. Flip to false to see the controls again.
+  const loading = true
+  if (loading) {
+    return (
+      <div className="player-stage">
+        <img
+          className="player-mock-video"
+          src="https://image.tmdb.org/t/p/original/O2ioY0wpltYjcevoP90MCEhGVO.jpg"
+          alt=""
+        />
+        <div className="player-loading">
+          <Spinner size={52} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="player-stage">

@@ -44,6 +44,39 @@ body {
   object-position: center;
 }
 
+/* ---------- Apple-style activity spinner ---------- */
+/* Ring of 12 tapered spokes; the whole ring steps around in 12 discrete jumps
+   so the bright leader hands off spoke-to-spoke with a trailing fade — the
+   classic Cupertino look (matches the native player's AppleSpinner). */
+.player-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 5;
+}
+.spinner {
+  position: relative;
+  display: inline-block;
+  animation: spinnerRotate 1s steps(12) infinite;
+}
+.spinner__spoke {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 8%;
+  height: 26%;
+  margin-left: -4%;
+  border-radius: 999px;
+  background: var(--muted);
+  transform-origin: center 192%; /* pivot at the ring centre */
+}
+@keyframes spinnerRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---------- Top bar ---------- */
 .player-top {
   position: absolute;
