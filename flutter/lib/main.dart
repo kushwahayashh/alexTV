@@ -32,9 +32,9 @@ class AlexTvApp extends StatelessWidget {
       title: 'AlexTV',
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
-        // Varela Round applied app-wide. Inline TextStyles leave fontFamily unset,
-        // so they inherit Varela Round from this text theme.
-        textTheme: GoogleFonts.varelaRoundTextTheme(base.textTheme),
+        // Space Grotesk applied app-wide. Inline TextStyles leave fontFamily unset,
+        // so they inherit Space Grotesk from this text theme.
+        textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme),
       ),
       // Wrap the whole Navigator (not just `home`) in the design scaler, so
       // pushed routes — Details, Search, Player — are scaled to the design

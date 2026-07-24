@@ -405,7 +405,7 @@ class _DetailsContent extends StatelessWidget {
               ],
               const SizedBox(width: 16),
               // Split label and value into two Texts in a center-aligned row so
-              // Varela Round's lining figures (cap-height) and the mixed-case
+              // Space Grotesk's lining figures (cap-height) and the mixed-case
               // "Rating" optically align instead of sharing one baseline where
               // the number rides above the lowercase. Em dash dropped — it
               // floats at the em-box center in this font, not the baseline.
@@ -578,7 +578,7 @@ class _SeriesBarDelegate extends SliverPersistentHeaderDelegate {
 
   // Fixed bar height. The child is forced to exactly this height so its paint
   // extent always equals the declared extent — otherwise, if the content lays
-  // out shorter (e.g. a fallback font with smaller metrics before Varela Round
+  // out shorter (e.g. a fallback font with smaller metrics before Space Grotesk
   // loads, as on web), the pinned sliver throws "layoutExtent exceeds
   // paintExtent".
   static const double _barHeight = 82;
@@ -798,8 +798,8 @@ class _SeasonTabState extends State<_SeasonTab> with FocusableState {
                   : Colors.white.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(999),
             ),
-            // Merge onto the inherited DefaultTextStyle (which carries Varela
-            // Round from the theme) instead of replacing it — a bare TextStyle
+            // Merge onto the inherited DefaultTextStyle (which carries Space
+            // Grotesk from the theme) instead of replacing it — a bare TextStyle
             // here would drop the font family back to Roboto.
             child: AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 160),

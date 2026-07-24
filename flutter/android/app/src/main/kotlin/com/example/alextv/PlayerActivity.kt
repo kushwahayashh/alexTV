@@ -171,14 +171,20 @@ private fun AppleSpinner(
     }
 }
 
-// Varela Round, bundled at res/font/varela_round.ttf. Applied to every Text so
-// typography matches the old Flutter/Dart player exactly.
-private val VarelaRound = FontFamily(Font(R.font.varela_round))
+// Space Grotesk, bundled at res/font/space_grotesk_*.ttf. Applied to every Text so
+// typography matches the Flutter/Dart player exactly. Static instances per weight
+// so Compose fontWeight actually renders.
+private val SpaceGrotesk = FontFamily(
+    Font(R.font.space_grotesk_regular, FontWeight.W400),
+    Font(R.font.space_grotesk_medium, FontWeight.W500),
+    Font(R.font.space_grotesk_semibold, FontWeight.W600),
+    Font(R.font.space_grotesk_bold, FontWeight.W700),
+)
 
 private const val SUBTITLE_TEXT_SIZE_FRACTION = 0.045f
 
-private fun PlayerView.applyVarelaRoundSubtitleStyle() {
-    val subtitleTypeface = ResourcesCompat.getFont(context, R.font.varela_round)
+private fun PlayerView.applySpaceGroteskSubtitleStyle() {
+    val subtitleTypeface = ResourcesCompat.getFont(context, R.font.space_grotesk)
     subtitleView?.apply {
         setStyle(
             CaptionStyleCompat(
@@ -729,7 +735,7 @@ private fun PlayerScreen(
                 PlayerView(ctx).apply {
                     useController = false
                     setKeepContentOnPlayerReset(true)
-                    applyVarelaRoundSubtitleStyle()
+                    applySpaceGroteskSubtitleStyle()
                     this.player = player
                 }
             },
@@ -960,7 +966,7 @@ private fun ControlsOverlay(
             Text(
                 text = title,
                 color = TextColor,
-                fontFamily = VarelaRound,
+                fontFamily = SpaceGrotesk,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.W700,
                 maxLines = 1,
@@ -1263,7 +1269,7 @@ private fun TimeText(text: String) {
     Text(
         text = text,
         color = Color(0xD9FFFFFF),
-        fontFamily = VarelaRound,
+        fontFamily = SpaceGrotesk,
         fontSize = 16.sp,
         fontWeight = FontWeight.W700,
         style = TextStyle(
@@ -1482,7 +1488,7 @@ private fun MenuSectionHeader(text: String, isFirst: Boolean) {
     Text(
         text = text.uppercase(),
         color = MutedColor,
-        fontFamily = VarelaRound,
+        fontFamily = SpaceGrotesk,
         fontSize = 13.sp,
         fontWeight = FontWeight.W700,
         letterSpacing = 1.sp,
@@ -1512,7 +1518,7 @@ private fun MenuItemRow(track: Track, focused: Boolean, selected: Boolean) {
         Text(
             text = if (selected) "${track.label} ✔" else track.label,
             color = if (focused) BgColor else TextColor,
-            fontFamily = VarelaRound,
+            fontFamily = SpaceGrotesk,
             fontSize = 16.sp,
             fontWeight = FontWeight.W700,
             maxLines = 1,
@@ -1523,7 +1529,7 @@ private fun MenuItemRow(track: Track, focused: Boolean, selected: Boolean) {
         Text(
             text = track.meta,
             color = (if (focused) BgColor else TextColor).copy(alpha = 0.7f),
-            fontFamily = VarelaRound,
+            fontFamily = SpaceGrotesk,
             fontSize = 13.sp,
             fontWeight = FontWeight.W600,
             maxLines = 1,
@@ -1549,7 +1555,7 @@ private fun ErrorView(message: String) {
             Text(
                 text = message,
                 color = TextColor.copy(alpha = 0.7f),
-                fontFamily = VarelaRound,
+                fontFamily = SpaceGrotesk,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
             )
@@ -1557,7 +1563,7 @@ private fun ErrorView(message: String) {
             Text(
                 text = "Press Back to return",
                 color = MutedColor,
-                fontFamily = VarelaRound,
+                fontFamily = SpaceGrotesk,
                 fontSize = 14.sp,
             )
         }
