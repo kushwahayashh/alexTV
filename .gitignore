@@ -25,3 +25,9 @@ yarn-error.log*
 # Python
 __pycache__/
 *.pyc
+
+# --- AlexStream backend ---
+alexstream/backend/node_modules/
+alexstream/backend/.env
+.env
+!.env.example
