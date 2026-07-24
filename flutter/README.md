@@ -9,7 +9,7 @@ releases.
 
 - Flutter (stable, currently 3.44.x)
 - `http` for backend + TMDB calls
-- `google_fonts` (Space Grotesk, app-wide)
+- `google_fonts` (Poppins, app-wide)
 - `video_player` with a vendored `video_player_android` patch
 - `path_provider` + `open_filex` for APK self-update
 - Native platform view (`SurfaceView`) wrapping ExoPlayer

@@ -175,20 +175,20 @@ private fun AppleSpinner(
     }
 }
 
-// Space Grotesk, bundled at res/font/space_grotesk_*.ttf. Applied to every Text so
+// Poppins, bundled at res/font/poppins_*.ttf. Applied to every Text so
 // typography matches the Flutter/Dart player exactly. Static instances per weight
 // so Compose fontWeight actually renders.
-private val SpaceGrotesk = FontFamily(
-    Font(R.font.space_grotesk_regular, FontWeight.W400),
-    Font(R.font.space_grotesk_medium, FontWeight.W500),
-    Font(R.font.space_grotesk_semibold, FontWeight.W600),
-    Font(R.font.space_grotesk_bold, FontWeight.W700),
+private val Poppins = FontFamily(
+    Font(R.font.poppins_regular, FontWeight.W400),
+    Font(R.font.poppins_medium, FontWeight.W500),
+    Font(R.font.poppins_semibold, FontWeight.W600),
+    Font(R.font.poppins_bold, FontWeight.W700),
 )
 
 private const val SUBTITLE_TEXT_SIZE_FRACTION = 0.045f
 
-private fun PlayerView.applySpaceGroteskSubtitleStyle() {
-    val subtitleTypeface = ResourcesCompat.getFont(context, R.font.space_grotesk)
+private fun PlayerView.applyPoppinsSubtitleStyle() {
+    val subtitleTypeface = ResourcesCompat.getFont(context, R.font.poppins)
     subtitleView?.apply {
         setStyle(
             CaptionStyleCompat(
@@ -739,7 +739,7 @@ private fun PlayerScreen(
                 PlayerView(ctx).apply {
                     useController = false
                     setKeepContentOnPlayerReset(true)
-                    applySpaceGroteskSubtitleStyle()
+                    applyPoppinsSubtitleStyle()
                     this.player = player
                 }
             },
@@ -970,7 +970,7 @@ private fun ControlsOverlay(
             Text(
                 text = title,
                 color = TextColor,
-                fontFamily = SpaceGrotesk,
+                fontFamily = Poppins,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.W700,
                 maxLines = 1,
@@ -1273,7 +1273,7 @@ private fun TimeText(text: String) {
     Text(
         text = text,
         color = Color(0xD9FFFFFF),
-        fontFamily = SpaceGrotesk,
+        fontFamily = Poppins,
         fontSize = 16.sp,
         fontWeight = FontWeight.W700,
         style = TextStyle(
@@ -1492,7 +1492,7 @@ private fun MenuSectionHeader(text: String, isFirst: Boolean) {
     Text(
         text = text.uppercase(),
         color = MutedColor,
-        fontFamily = SpaceGrotesk,
+        fontFamily = Poppins,
         fontSize = 13.sp,
         fontWeight = FontWeight.W700,
         letterSpacing = 1.sp,
@@ -1522,7 +1522,7 @@ private fun MenuItemRow(track: Track, focused: Boolean, selected: Boolean) {
         Text(
             text = if (selected) "${track.label} ✔" else track.label,
             color = if (focused) BgColor else TextColor,
-            fontFamily = SpaceGrotesk,
+            fontFamily = Poppins,
             fontSize = 16.sp,
             fontWeight = FontWeight.W700,
             maxLines = 1,
@@ -1533,7 +1533,7 @@ private fun MenuItemRow(track: Track, focused: Boolean, selected: Boolean) {
         Text(
             text = track.meta,
             color = (if (focused) BgColor else TextColor).copy(alpha = 0.7f),
-            fontFamily = SpaceGrotesk,
+            fontFamily = Poppins,
             fontSize = 13.sp,
             fontWeight = FontWeight.W600,
             maxLines = 1,
@@ -1559,7 +1559,7 @@ private fun ErrorView(message: String) {
             Text(
                 text = message,
                 color = TextColor.copy(alpha = 0.7f),
-                fontFamily = SpaceGrotesk,
+                fontFamily = Poppins,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
             )
@@ -1567,7 +1567,7 @@ private fun ErrorView(message: String) {
             Text(
                 text = "Press Back to return",
                 color = MutedColor,
-                fontFamily = SpaceGrotesk,
+                fontFamily = Poppins,
                 fontSize = 14.sp,
             )
         }

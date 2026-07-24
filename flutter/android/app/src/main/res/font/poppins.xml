@@ -3,17 +3,17 @@
     <font
         android:fontStyle="normal"
         android:fontWeight="400"
-        android:font="@font/space_grotesk_regular" />
+        android:font="@font/poppins_regular" />
     <font
         android:fontStyle="normal"
         android:fontWeight="500"
-        android:font="@font/space_grotesk_medium" />
+        android:font="@font/poppins_medium" />
     <font
         android:fontStyle="normal"
         android:fontWeight="600"
-        android:font="@font/space_grotesk_semibold" />
+        android:font="@font/poppins_semibold" />
     <font
         android:fontStyle="normal"
         android:fontWeight="700"
-        android:font="@font/space_grotesk_bold" />
+        android:font="@font/poppins_bold" />
 </font-family>

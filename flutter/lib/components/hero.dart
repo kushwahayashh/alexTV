@@ -168,7 +168,7 @@ class _HeroContent extends StatelessWidget {
               ],
               const SizedBox(width: 16),
               // Split label and value into two Texts in a center-aligned row so
-              // Space Grotesk's lining figures (cap-height) and the mixed-case
+              // Poppins's lining figures (cap-height) and the mixed-case
               // "Rating" optically align instead of sharing one baseline where
               // the number rides above the lowercase. Em dash dropped — it
               // floats at the em-box center in this font, not the baseline.

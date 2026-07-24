@@ -32,9 +32,9 @@ class AlexTvApp extends StatelessWidget {
       title: 'AlexTV',
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
-        // Space Grotesk applied app-wide. Inline TextStyles leave fontFamily unset,
-        // so they inherit Space Grotesk from this text theme.
-        textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme),
+        // Poppins applied app-wide. Inline TextStyles leave fontFamily unset,
+        // so they inherit Poppins from this text theme.
+        textTheme: GoogleFonts.poppinsTextTheme(base.textTheme),
       ),
       // Wrap the whole Navigator (not just `home`) in the design scaler, so
       // pushed routes — Details, Search, Player — are scaled to the design
