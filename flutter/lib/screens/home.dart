@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import '../api/tmdb.dart' as api;
 import '../components/hero.dart' as ui;
 import '../components/rail.dart';
 import '../components/sidebar.dart';
+import '../components/spinner.dart';
 import '../focus/focus_engine.dart';
 import '../main.dart' show openDetails, openSearch, openLibrary, runUpdate, routeObserver;
 import '../theme.dart';
@@ -222,7 +222,7 @@ class _ScreenLoader extends StatelessWidget {
     return SizedBox(
       height: MediaQuery.of(context).size.height,
       child: const Center(
-        child: CupertinoActivityIndicator(radius: 18, color: AppColors.muted),
+        child: AppleSpinner(),
       ),
     );
   }

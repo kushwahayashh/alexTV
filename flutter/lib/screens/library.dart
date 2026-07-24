@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import '../api/library.dart';
 import '../api/stream.dart';
 import '../components/sidebar.dart';
+import '../components/spinner.dart';
 import '../focus/focus_engine.dart';
 import '../focus/focusable.dart';
 import '../main.dart' show openSearch, runUpdate;
@@ -266,10 +266,7 @@ class _LibraryState extends State<Library> with WidgetsBindingObserver {
         child: SizedBox(
           height: MediaQuery.of(context).size.height - 168,
           child: const Center(
-            child: CupertinoActivityIndicator(
-              radius: 18,
-              color: AppColors.muted,
-            ),
+            child: AppleSpinner(),
           ),
         ),
       );

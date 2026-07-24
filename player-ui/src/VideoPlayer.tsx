@@ -432,7 +432,7 @@ export function VideoPlayer({
           alt=""
         />
         <div className="player-loading">
-          <Spinner size={52} />
+          <Spinner />
         </div>
       </div>
     )

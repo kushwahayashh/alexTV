@@ -133,7 +133,7 @@ private const val SPINNER_SPOKES = 12
 @Composable
 private fun AppleSpinner(
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 52.dp,
+    size: androidx.compose.ui.unit.Dp = 36.dp,
     color: Color = MutedColor,
 ) {
     val transition = rememberInfiniteTransition(label = "spinner")
